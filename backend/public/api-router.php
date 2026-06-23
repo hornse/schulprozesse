@@ -1,0 +1,81 @@
+<?php
+/*
+ * Schulprozesse – prozesse.hornse.de
+ * Copyright (C) 2026 Sebastian Horn, Friedrich-Rückert-Gymnasium Düsseldorf
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../bootstrap.php';
+
+use App\Response;
+
+require __DIR__ . '/../api/auth.php';
+require __DIR__ . '/../api/dashboard.php';
+require __DIR__ . '/../api/schritte.php';
+require __DIR__ . '/../api/prozesse.php';
+require __DIR__ . '/../api/rollen.php';
+require __DIR__ . '/../api/phasen.php';
+require __DIR__ . '/../api/vorlagen.php';
+require __DIR__ . '/../api/vorlagen-sets.php';
+require __DIR__ . '/../api/export.php';
+
+$route  = trim((string) ($_GET['route'] ?? ''), '/');
+$method = $_SERVER['REQUEST_METHOD'];
+
+$rawBody = file_get_contents('php://input');
+$input   = $rawBody ? (json_decode($rawBody, true) ?? []) : [];
+
+$routes = [
+    ['POST',   '#^api/login$#',                                          'handleLogin'],
+    ['POST',   '#^api/logout$#',                                         'handleLogout'],
+    ['GET',    '#^api/me$#',                                             'handleMe'],
+
+    ['GET',    '#^api/dashboard$#',                                      'handleDashboard'],
+
+    ['GET',    '#^api/schritte$#',                                       'handleListSchritte'],
+    ['PATCH',  '#^api/schritte/(?P<id>\d+)$#',                           'handleUpdateSchritt'],
+
+    ['GET',    '#^api/prozesse$#',                                       'handleListProzesse'],
+    ['POST',   '#^api/prozesse$#',                                       'handleCreateProzess'],
+    ['PATCH',  '#^api/prozesse/(?P<id>\d+)$#',                           'handleUpdateProzess'],
+    ['POST',   '#^api/prozesse/(?P<id>\d+)/aktivieren$#',                'handleActivateProzess'],
+    ['GET',    '#^api/prozesse/(?P<id>\d+)/teilnehmer$#',                'handleListTeilnehmer'],
+    ['POST',   '#^api/prozesse/(?P<id>\d+)/teilnehmer$#',               'handleUpsertTeilnehmer'],
+    ['DELETE', '#^api/prozesse/(?P<id>\d+)/teilnehmer/(?P<user>[^/]+)$#', 'handleDeleteTeilnehmer'],
+
+    ['GET',    '#^api/rollen$#',                                         'handleListRollen'],
+    ['POST',   '#^api/rollen$#',                                         'handleUpsertRolle'],
+    ['DELETE', '#^api/rollen/(?P<user>[^/]+)$#',                        'handleDeleteRolle'],
+
+    ['GET',    '#^api/vorlagen$#',                                       'handleListVorlagen'],
+    ['POST',   '#^api/vorlagen$#',                                       'handleCreateVorlage'],
+    ['PATCH',  '#^api/vorlagen/(?P<id>\d+)$#',                           'handleUpdateVorlage'],
+    ['POST',   '#^api/vorlagen/reihenfolge$#',                           'handleReihenfolgeVorlagen'],
+
+    ['GET',    '#^api/phasen$#',                                         'handleListPhasen'],
+    ['POST',   '#^api/phasen$#',                                         'handleCreatePhase'],
+    ['PATCH',  '#^api/phasen/(?P<id>\d+)$#',                             'handleUpdatePhase'],
+    ['POST',   '#^api/phasen/reihenfolge$#',                             'handleReihenfolgePhasen'],
+
+    ['GET',    '#^api/vorlagen-sets$#',                                  'handleListVorlagenSets'],
+    ['POST',   '#^api/vorlagen-sets$#',                                  'handleCreateVorlagenSet'],
+    ['GET',    '#^api/vorlagen-sets/(?P<id>\d+)$#',                      'handleGetVorlagenSet'],
+    ['DELETE', '#^api/vorlagen-sets/(?P<id>\d+)$#',                      'handleDeleteVorlagenSet'],
+
+    ['GET',    '#^api/export/csv$#',                                     'handleExportCsv'],
+    ['GET',    '#^api/export/aktivitaeten$#',                            'handleExportAktivitaeten'],
+    ['GET',    '#^api/aktivitaeten$#',                                   'handleListAktivitaeten'],
+];
+
+foreach ($routes as [$routeMethod, $pattern, $handler]) {
+    if ($method !== $routeMethod || !preg_match($pattern, $route, $matches)) {
+        continue;
+    }
+    $params = array_filter($matches, fn($key) => !is_int($key), ARRAY_FILTER_USE_KEY);
+    $handler($db, $config, $input, $params);
+    exit;
+}
+
+Response::error("Unbekannte Route: $method /$route", 404);

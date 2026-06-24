@@ -8,15 +8,23 @@
 </head>
 <body>
 
-<header id="header">
-  <p class="eyebrow">Friedrich-Rückert-Gymnasium · Schulprozesse</p>
-  <h1>Schulprozesse</h1>
-</header>
+<!-- App-Shell: sticky Header mit Navigation -->
+<div id="app-shell">
+  <div class="shell-brand">
+    <span class="brand-text">Friedrich-Rückert-Gymnasium · <strong>Schulprozesse</strong></span>
+    <div id="shell-user"></div>
+  </div>
+  <nav class="shell-nav" id="shell-nav">
+    <!-- wird von app.js befüllt -->
+  </nav>
+</div>
 
-<!-- Die JS-Datei entscheidet anhand von STATE.user, ob hier der
-     Login-Bildschirm oder die App selbst gerendert wird. -->
+<!-- Prozess-Tabs (unter dem Header, nur wenn eingeloggt) -->
+<div id="prozess-leiste" style="display:none;" class="prozess-leiste"></div>
+
+<!-- Hauptinhalt -->
 <main id="app">
-  <p class="lade-hinweis">Lädt…</p>
+  <p style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:13px;">Lädt…</p>
 </main>
 
 <footer>

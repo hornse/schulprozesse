@@ -25,8 +25,11 @@ const STATE = {
   ganttZoom: 1,
 };
 
-const $app      = document.getElementById('app');
-const $werBinIch = document.getElementById('wer-bin-ich');
+const $app          = document.getElementById('app');
+const $werBinIch    = document.getElementById('wer-bin-ich');
+const $shellUser    = document.getElementById('shell-user');
+const $shellNav     = document.getElementById('shell-nav');
+const $prozessLeiste = document.getElementById('prozess-leiste');
 
 // ============================================================================
 // API-Wrapper
@@ -376,23 +379,10 @@ let dragZustand = null;
 let dragZustandPhase = null;
 
 function render() {
-  if (STATE.user) {
-    $werBinIch.innerHTML = `
-      <span class="footer-user">
-        <span class="footer-user-name">${STATE.user.anzeigename}</span>
-        <span class="footer-user-rolle ${STATE.user.rolle === 'admin' ? 'footer-rolle-admin' : 'footer-rolle-mitglied'}">${STATE.user.rolle}</span>
-      </span>`;
-  } else {
-    $werBinIch.innerHTML = '';
-  }
+  renderShell();
+  renderProzessLeiste();
 
   $app.innerHTML = '';
-  $app.appendChild(renderKopfleiste());
-
-  // Prozess-Tabs immer anzeigen wenn eingeloggt (auch bei einem Prozess für Kontext)
-  if (STATE.user && STATE.prozesse.length > 0) {
-    $app.appendChild(renderProzessTabs());
-  }
 
   if (STATE.ansicht === 'login') {
     $app.appendChild(renderLogin());
@@ -400,75 +390,91 @@ function render() {
     $app.appendChild(renderChecklist());
   } else if (STATE.ansicht === 'zeitstrahl') {
     $app.appendChild(renderZeitstrahl());
+  } else if (STATE.ansicht === 'prozess-verwalten' && STATE.user) {
+    $app.appendChild(renderProzessVerwaltungSeite());
+  } else if (STATE.ansicht === 'admin' && STATE.user?.rolle === 'admin') {
+    $app.appendChild(renderAdminSeite());
   } else {
     $app.appendChild(renderDashboard());
   }
+}
 
+function renderShell() {
+  // Benutzer-Bereich oben rechts
   if (STATE.user) {
+    $shellUser.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'shell-user';
+    wrap.innerHTML = `
+      <span class="shell-user-name">${STATE.user.anzeigename}</span>
+      <span class="shell-user-rolle rolle-${STATE.user.rolle}">${STATE.user.rolle}</span>`;
+    const abmelden = document.createElement('button');
+    abmelden.className = 'shell-abmelden';
+    abmelden.textContent = 'Abmelden';
+    abmelden.addEventListener('click', doLogout);
+    wrap.appendChild(abmelden);
+    $shellUser.appendChild(wrap);
+  } else {
+    $shellUser.innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className = 'shell-anmelden';
+    btn.textContent = 'Anmelden';
+    btn.addEventListener('click', () => { STATE.ansicht = 'login'; render(); });
+    $shellUser.appendChild(btn);
+  }
+
+  // Navigation
+  $shellNav.innerHTML = '';
+
+  const tabs = [
+    { id: 'dashboard',  label: 'Dashboard',  icon: '◎',  immer: true },
+    { id: 'checkliste', label: 'Checkliste', icon: '☑',  nurLogin: true },
+    { id: 'zeitstrahl', label: 'Zeitstrahl', icon: '◫',  immer: true },
+  ];
+
+  tabs.forEach((t) => {
+    if (t.nurLogin && !STATE.user) return;
+    const btn = document.createElement('button');
+    btn.className = 'nav-tab' + (STATE.ansicht === t.id ? ' aktiv' : '');
+    btn.innerHTML = `<span class="nav-icon">${t.icon}</span>${t.label}`;
+    btn.addEventListener('click', () => { STATE.ansicht = t.id; render(); });
+    $shellNav.appendChild(btn);
+  });
+
+  // Trennlinie vor prozessspezifischen Tabs
+  if (STATE.user && STATE.prozessId) {
     const kannVerwalten = STATE.user.rolle === 'admin' ||
       STATE.teilnehmer.some((t) =>
-        t.webuntis_user === STATE.user.webuntis_user &&
-        t.rolle === 'verantwortlich'
+        t.webuntis_user === STATE.user.webuntis_user && t.rolle === 'verantwortlich'
       );
-    if (kannVerwalten && STATE.prozessId) {
-      $app.appendChild(renderProzessVerwaltung());
+
+    if (kannVerwalten) {
+      const sep = document.createElement('div'); sep.className = 'nav-sep';
+      $shellNav.appendChild(sep);
+      const btn = document.createElement('button');
+      btn.className = 'nav-tab' + (STATE.ansicht === 'prozess-verwalten' ? ' aktiv' : '');
+      btn.innerHTML = `<span class="nav-icon">⚙</span>Prozess verwalten`;
+      btn.addEventListener('click', () => { STATE.ansicht = 'prozess-verwalten'; render(); });
+      $shellNav.appendChild(btn);
     }
+
     if (STATE.user.rolle === 'admin') {
-      $app.appendChild(renderAdminBereich());
+      const btn = document.createElement('button');
+      btn.className = 'nav-tab' + (STATE.ansicht === 'admin' ? ' aktiv' : '');
+      btn.innerHTML = `<span class="nav-icon">⚡</span>Admin`;
+      btn.addEventListener('click', () => { STATE.ansicht = 'admin'; render(); });
+      $shellNav.appendChild(btn);
     }
   }
 }
 
-// ============================================================================
-// Kopfleiste
-// ============================================================================
-function renderKopfleiste() {
-  const leiste = document.createElement('div');
-  leiste.className = 'top-leiste';
-
-  let tabsHtml, rechtsHtml;
-
-  if (STATE.user) {
-    tabsHtml = `
-      <button class="tab ${STATE.ansicht === 'dashboard' ? 'aktiv' : ''}" data-ansicht="dashboard">Dashboard</button>
-      <button class="tab ${STATE.ansicht === 'checkliste' ? 'aktiv' : ''}" data-ansicht="checkliste">Checkliste</button>
-      <button class="tab ${STATE.ansicht === 'zeitstrahl' ? 'aktiv' : ''}" data-ansicht="zeitstrahl">Zeitstrahl</button>
-    `;
-    rechtsHtml = `
-      <div class="header-user">
-        <span class="header-user-name">${STATE.user.anzeigename}</span>
-        <span class="header-user-rolle ${STATE.user.rolle === 'admin' ? 'footer-rolle-admin' : 'footer-rolle-mitglied'}">${STATE.user.rolle}</span>
-        <button class="btn btn-sekundaer" id="logout-btn">Abmelden</button>
-      </div>`;
-  } else if (STATE.ansicht === 'login') {
-    tabsHtml = `<button class="tab" data-ansicht="dashboard">Dashboard</button>`;
-    rechtsHtml = `<button class="btn btn-sekundaer" id="abbrechen-btn">Abbrechen</button>`;
-  } else {
-    tabsHtml = `
-      <button class="tab ${STATE.ansicht === 'dashboard' ? 'aktiv' : ''}" data-ansicht="dashboard">Dashboard</button>
-      <button class="tab ${STATE.ansicht === 'zeitstrahl' ? 'aktiv' : ''}" data-ansicht="zeitstrahl">Zeitstrahl</button>
-    `;
-    rechtsHtml = `<button class="btn btn-sekundaer" id="anmelden-btn">Anmelden</button>`;
+function renderProzessLeiste() {
+  if (!STATE.user || STATE.prozesse.length === 0) {
+    $prozessLeiste.style.display = 'none';
+    return;
   }
-
-  leiste.innerHTML = `<div class="tabs">${tabsHtml}</div>${rechtsHtml}`;
-  leiste.querySelectorAll('[data-ansicht]').forEach((btn) => {
-    btn.addEventListener('click', () => { STATE.ansicht = btn.dataset.ansicht; render(); });
-  });
-  leiste.querySelector('#logout-btn')?.addEventListener('click', doLogout);
-  leiste.querySelector('#anmelden-btn')?.addEventListener('click', () => { STATE.ansicht = 'login'; render(); });
-  leiste.querySelector('#abbrechen-btn')?.addEventListener('click', () => { STATE.ansicht = 'dashboard'; render(); });
-  return leiste;
-}
-
-// ============================================================================
-// Prozess-Tabs (eingeloggt)
-// ============================================================================
-function renderProzessTabs() {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'prozess-tabs kein-druck';
-
-  if (!STATE.prozesse || STATE.prozesse.length === 0) return wrapper;
+  $prozessLeiste.style.display = 'flex';
+  $prozessLeiste.innerHTML = '';
 
   STATE.prozesse.forEach((p) => {
     const tab = document.createElement('button');
@@ -478,14 +484,34 @@ function renderProzessTabs() {
     tab.title = p.beschreibung || p.label;
     tab.addEventListener('click', async () => {
       if (p.id === STATE.prozessId) return;
-      wrapper.querySelectorAll('.prozess-tab').forEach((t) => t.classList.remove('aktiv'));
-      tab.classList.add('aktiv');
       await waehleProzess(p.id);
     });
-    wrapper.appendChild(tab);
+    $prozessLeiste.appendChild(tab);
   });
+}
 
-  return wrapper;
+// renderProzessVerwaltungSeite – eigene Seite statt Block am Ende
+function renderProzessVerwaltungSeite() {
+  const container = document.createElement('div');
+  container.innerHTML = `<div class="page-header">
+    <h2 class="page-title">Prozess verwalten</h2>
+    <span class="page-subtitle">${STATE.aktiverProzess?.label ?? ''}</span>
+  </div>`;
+  container.appendChild(renderProzessVerwaltungInhalt());
+  return container;
+}
+
+// renderAdminSeite – eigene Seite statt Block am Ende
+function renderAdminSeite() {
+  const container = document.createElement('div');
+  container.innerHTML = `<div class="page-header">
+    <h2 class="page-title">Administration</h2>
+  </div>`;
+  container.appendChild(renderProzesseBlock());
+  container.appendChild(renderZugriffBlock());
+  container.appendChild(renderVorlagenVerwaltung());
+  container.appendChild(renderAktivitaetsprotokoll());
+  return container;
 }
 
 // ============================================================================
@@ -493,11 +519,10 @@ function renderProzessTabs() {
 // ============================================================================
 function renderLogin() {
   const wrapper = document.createElement('div');
-  wrapper.className = 'login-box';
+  wrapper.className = 'login-wrap';
   wrapper.innerHTML = `
-    <p style="font-size:13px;color:var(--muted);margin-top:0;">
-      Anmeldung mit den WebUntis-Zugangsdaten – nur für freigegebene Personen.
-    </p>
+    <h2>Anmelden</h2>
+    <p>WebUntis-Zugangsdaten verwenden – nur für freigegebene Personen.</p>
     <div id="login-fehler"></div>
     <form id="login-form">
       <label for="login-user">Benutzername</label>
@@ -608,10 +633,11 @@ function renderDashboardFuerProzess(schritte, label, eingeloggt) {
   } else {
     aktuellBlock.innerHTML = `<p class="dash-label">Aktuell dran</p><p class="dash-titel">Alles erledigt 🎉</p>`;
   }
-  container.appendChild(aktuellBlock);
-
-  if (ueberfaellig.length) container.appendChild(renderDashListe('Überfällig', ueberfaellig, true, parallelIds));
-  if (demnaechst.length) container.appendChild(renderDashListe('Demnächst (14 Tage)', demnaechst, false, parallelIds));
+  const grid = document.createElement('div');
+  grid.className = 'dash-grid';
+  grid.appendChild(aktuellBlock);
+  if (ueberfaellig.length) grid.appendChild(renderDashListe('Überfällig', ueberfaellig, true, parallelIds));
+  if (demnaechst.length) grid.appendChild(renderDashListe('Demnächst (14 Tage)', demnaechst, false, parallelIds));
 
   const phasenBlock = document.createElement('div');
   phasenBlock.className = 'dash-block';
@@ -626,7 +652,8 @@ function renderDashboardFuerProzess(schritte, label, eingeloggt) {
       <span class="progress-label">${daten.erledigt}/${daten.gesamt}</span>`;
     phasenBlock.appendChild(zeile);
   }
-  container.appendChild(phasenBlock);
+  grid.appendChild(phasenBlock);
+  container.appendChild(grid);
   return container;
 }
 
@@ -1091,10 +1118,9 @@ function exportiereGanttAlsSvg() {
 // ============================================================================
 // Prozess-Verwaltung (Verantwortliche + Admins)
 // ============================================================================
-function renderProzessVerwaltung() {
+function renderProzessVerwaltungInhalt() {
   const container = document.createElement('div');
-  container.className = 'admin-bereich';
-  container.innerHTML = `<h2>Prozess verwalten: ${STATE.aktiverProzess?.label ?? ''}</h2>`;
+  container.className = 'admin-section';
 
   // Öffentlich/Privat
   const oeffentlich = STATE.aktiverProzess?.oeffentlich ?? 1;
@@ -1113,7 +1139,7 @@ function renderProzessVerwaltung() {
   // Teilnehmer
   const teilnehmerBlock = document.createElement('div');
   teilnehmerBlock.innerHTML = `
-    <h3 style="font-size:13px;color:var(--muted);margin-top:20px;">Teilnehmer</h3>
+    <h3 class="">Teilnehmer</h3>
     <table class="admin-tabelle">
       <thead><tr><th>Kürzel</th><th>Name</th><th>Rolle</th><th></th></tr></thead>
       <tbody>
@@ -1172,12 +1198,11 @@ function renderProzessVerwaltung() {
 }
 
 // ============================================================================
-// Admin-Bereich (Prozesse anlegen, Zugriff, Vorlagenverwaltung)
+// Admin-Inhaltsblöcke (genutzt von renderAdminSeite)
 // ============================================================================
 function renderAdminBereich() {
+  // Rückwärtskompatibilität – wird nicht mehr direkt aufgerufen
   const container = document.createElement('div');
-  container.className = 'admin-bereich';
-  container.innerHTML = `<h2>Admin-Bereich</h2>`;
   container.appendChild(renderProzesseBlock());
   container.appendChild(renderZugriffBlock());
   container.appendChild(renderVorlagenVerwaltung());
@@ -1201,7 +1226,7 @@ function renderProzesseBlock() {
           </tr>`).join('')}
       </tbody>
     </table>
-    <h3 style="font-size:13px;color:var(--muted);margin-top:20px;">Neuen Prozess anlegen</h3>
+    <h3 class="">Neuen Prozess anlegen</h3>
     <form class="inline-form" id="neuer-prozess-form">
       <div class="feld" style="flex:1;"><label>Name</label>
         <input type="text" id="prozess-label" placeholder="z. B. Abitur 2027" required style="width:100%;"></div>
@@ -1223,7 +1248,7 @@ function renderProzesseBlock() {
       <button class="btn" type="submit" style="width:auto;">Anlegen</button>
     </form>
 
-    <h3 style="font-size:13px;color:var(--muted);margin-top:20px;">Gespeicherte Vorlagen (Snapshots)</h3>
+    <h3 class="">Gespeicherte Vorlagen (Snapshots)</h3>
     <div>
       ${STATE.vorlagenSets.length === 0
         ? '<p style="font-size:12px;color:var(--muted);">Noch keine Snapshots.</p>'
@@ -1273,7 +1298,7 @@ function renderProzesseBlock() {
 function renderZugriffBlock() {
   const rollenBlock = document.createElement('div');
   rollenBlock.innerHTML = `
-    <h3 style="font-size:13px;color:var(--muted);margin-top:24px;">Zugriff (App-Freigaben)</h3>
+    <h3 class="">Zugriff (App-Freigaben)</h3>
     <table class="admin-tabelle">
       <thead><tr><th>Kürzel</th><th>Name</th><th>Rolle</th><th></th></tr></thead>
       <tbody>
@@ -1322,7 +1347,7 @@ function renderZugriffBlock() {
 // Vorlagen-Verwaltung (Phasen + Schritte – gleiche Logik wie alte App)
 function renderVorlagenVerwaltung() {
   const block = document.createElement('div');
-  block.innerHTML = '<h3 style="font-size:13px;color:var(--muted);margin-top:24px;">Vorlage verwalten (Phasen & Schritte)</h3>';
+  block.innerHTML = '<h3 class="">Vorlage verwalten (Phasen & Schritte)</h3>';
 
   const phasenListe = document.createElement('div'); phasenListe.className = 'phasen-liste';
   for (const phase of STATE.phasen) {
@@ -1478,7 +1503,7 @@ async function ladeAktivitaeten() {
 
 function renderAktivitaetsprotokoll() {
   const block = document.createElement('div');
-  block.innerHTML = `<h3 style="font-size:13px;color:var(--muted);margin-top:24px;">Aktivitätsprotokoll</h3><div id="aktivitaeten-liste" style="font-size:12px;">Lädt…</div>`;
+  block.innerHTML = `<h3 class="">Aktivitätsprotokoll</h3><div id="aktivitaeten-liste" style="font-size:12px;">Lädt…</div>`;
   const exportBtn = document.createElement('button'); exportBtn.className = 'btn-sekundaer btn kein-druck'; exportBtn.style.cssText = 'width:auto;margin-top:8px;font-size:11px;'; exportBtn.textContent = '⬇ Als CSV exportieren';
   exportBtn.addEventListener('click', () => { window.location.href = `/api/export/aktivitaeten?prozess_id=${STATE.prozessId}`; });
   block.appendChild(exportBtn);

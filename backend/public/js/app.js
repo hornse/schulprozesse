@@ -122,19 +122,12 @@ async function waehleProzess(id) {
   STATE.teilnehmer     = [];
   STATE.offeneSchritte = new Set();
 
-  // Sofort rendern – Tabs zeigen schon den richtigen aktiven Prozess,
-  // Checkliste zeigt Ladezustand (leere schritte)
-  render();
-
   const [schrittRes, teilRes] = await Promise.all([
     api(`/api/schritte?prozess_id=${id}`),
     api(`/api/prozesse/${id}/teilnehmer`),
   ]);
   STATE.schritte   = schrittRes.schritte;
   STATE.teilnehmer = teilRes;
-
-  // Nur Public Dashboard neu laden wenn nicht eingeloggt
-  if (!STATE.user) await ladePublicDashboard();
 
   render();
 }
@@ -485,13 +478,9 @@ function renderProzessTabs() {
     tab.title = p.beschreibung || p.label;
     tab.addEventListener('click', async () => {
       if (p.id === STATE.prozessId) return;
-      // Sofort visuelles Feedback: aktiven Tab wechseln
       wrapper.querySelectorAll('.prozess-tab').forEach((t) => t.classList.remove('aktiv'));
       tab.classList.add('aktiv');
-      tab.disabled = true;
-      tab.textContent = '⏳ ' + p.label + schloss;
       await waehleProzess(p.id);
-      tab.disabled = false;
     });
     wrapper.appendChild(tab);
   });

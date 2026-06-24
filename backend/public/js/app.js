@@ -119,7 +119,12 @@ async function waehleProzess(id) {
   STATE.prozessId      = id;
   STATE.aktiverProzess = STATE.prozesse.find((p) => p.id === id);
   STATE.schritte       = [];
+  STATE.teilnehmer     = [];
   STATE.offeneSchritte = new Set();
+
+  // Sofort rendern – Tabs zeigen schon den richtigen aktiven Prozess,
+  // Checkliste zeigt Ladezustand (leere schritte)
+  render();
 
   const [schrittRes, teilRes] = await Promise.all([
     api(`/api/schritte?prozess_id=${id}`),
@@ -128,8 +133,8 @@ async function waehleProzess(id) {
   STATE.schritte   = schrittRes.schritte;
   STATE.teilnehmer = teilRes;
 
-  // Public Dashboard neu laden damit Zeitstrahl korrekt ist
-  await ladePublicDashboard();
+  // Nur Public Dashboard neu laden wenn nicht eingeloggt
+  if (!STATE.user) await ladePublicDashboard();
 
   render();
 }
@@ -391,17 +396,14 @@ function render() {
   $app.innerHTML = '';
   $app.appendChild(renderKopfleiste());
 
-  // Prozess-Tabs immer anzeigen wenn eingeloggt und mehrere Prozesse vorhanden
-  if (STATE.user && STATE.prozesse.length > 1) {
+  // Prozess-Tabs immer anzeigen wenn eingeloggt (auch bei einem Prozess für Kontext)
+  if (STATE.user && STATE.prozesse.length > 0) {
     $app.appendChild(renderProzessTabs());
   }
 
   if (STATE.ansicht === 'login') {
     $app.appendChild(renderLogin());
   } else if (STATE.ansicht === 'checkliste' && STATE.user) {
-    if (STATE.prozesse.length === 1) {
-      $app.appendChild(renderProzessTabs()); // auch bei einem Prozess anzeigen für Kontext
-    }
     $app.appendChild(renderChecklist());
   } else if (STATE.ansicht === 'zeitstrahl') {
     $app.appendChild(renderZeitstrahl());
@@ -410,19 +412,12 @@ function render() {
   }
 
   if (STATE.user) {
-    // Prozess verwalten für alle Prozesse anzeigen wo man Verantwortlicher ist
-    const verantwortlicheProzesse = STATE.prozesse.filter((p) => {
-      if (STATE.user.rolle === 'admin') return true;
-      // Teilnehmer-Check: wir haben nur die Teilnehmer des aktiven Prozesses geladen
-      // Für den aktiven Prozess direkt prüfen
-      if (p.id === STATE.prozessId) {
-        return STATE.teilnehmer.some((t) => t.webuntis_user === STATE.user.webuntis_user && t.rolle === 'verantwortlich');
-      }
-      // Für andere Prozesse: meine_rolle aus der Prozessliste nutzen
-      return p.meine_rolle === 'verantwortlich';
-    });
-
-    if (verantwortlicheProzesse.length > 0 && STATE.prozessId) {
+    const kannVerwalten = STATE.user.rolle === 'admin' ||
+      STATE.teilnehmer.some((t) =>
+        t.webuntis_user === STATE.user.webuntis_user &&
+        t.rolle === 'verantwortlich'
+      );
+    if (kannVerwalten && STATE.prozessId) {
       $app.appendChild(renderProzessVerwaltung());
     }
     if (STATE.user.rolle === 'admin') {

@@ -110,11 +110,18 @@ async function ladeAlles() {
     STATE.teilnehmer = teilRes;
   }
 
-  if (STATE.user?.rolle === 'admin') {
+  // Phasen und Vorlagen für Admins UND Verantwortliche laden
+  const istVerantwortlich = STATE.teilnehmer.some(
+    (t) => t.webuntis_user === STATE.user?.webuntis_user && t.rolle === 'verantwortlich'
+  );
+  if (STATE.user?.rolle === 'admin' || istVerantwortlich) {
     STATE.phasen      = await api('/api/phasen');
     STATE.vorlagen    = await api('/api/vorlagen');
     STATE.vorlagenSets = await api('/api/vorlagen-sets');
-    STATE.rollen      = await api('/api/rollen');
+  }
+
+  if (STATE.user?.rolle === 'admin') {
+    STATE.rollen = await api('/api/rollen');
   }
 }
 
@@ -498,6 +505,14 @@ function renderProzessVerwaltungSeite() {
     <span class="page-subtitle">${STATE.aktiverProzess?.label ?? ''}</span>
   </div>`;
   container.appendChild(renderProzessVerwaltungInhalt());
+
+  // Verantwortliche können auch Phasen und Schritte ihres Prozesses verwalten
+  const vorlagenSection = document.createElement('div');
+  vorlagenSection.className = 'admin-section';
+  vorlagenSection.style.marginTop = '24px';
+  vorlagenSection.appendChild(renderVorlagenVerwaltung());
+  container.appendChild(vorlagenSection);
+
   return container;
 }
 
@@ -957,12 +972,16 @@ function renderGantt(liste, eingeloggt) {
   const gantt = document.createElement('div'); gantt.className = 'gantt-wrap';
   const kopfzeile = document.createElement('div'); kopfzeile.className = 'gantt-kopf';
   let kopfHtml = '<div class="gantt-label-zelle"></div>';
+  // Beschriftungsintervall: bei vielen Spalten nur jeden n-ten beschriften
+  const labelIntervall = spanSpalten > 60 ? 7 : spanSpalten > 30 ? 3 : spanSpalten > 15 ? 2 : 1;
   for (let i = 0; i < spanSpalten; i++) {
     const d = new Date(minDatum); d.setDate(d.getDate() + i * zoom);
     const iso = d.toISOString().slice(0, 10);
     const endD = new Date(d.getTime() + (zoom - 1) * 86400000);
     const istHeuteSpalte = iso <= heute && heute <= endD.toISOString().slice(0, 10);
-    kopfHtml += `<div class="gantt-tag ${istHeuteSpalte ? 'gantt-heute' : ''}">${d.getDate()}.${d.getMonth()+1}.</div>`;
+    const zeigeLabel = i % labelIntervall === 0 || d.getDate() === 1;
+    const label = zeigeLabel ? `${d.getDate()}.${d.getMonth()+1}.` : '';
+    kopfHtml += `<div class="gantt-tag ${istHeuteSpalte ? 'gantt-heute' : ''}">${label}</div>`;
   }
   kopfzeile.innerHTML = kopfHtml; gantt.appendChild(kopfzeile);
 

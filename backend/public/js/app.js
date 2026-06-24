@@ -869,16 +869,21 @@ function renderZeitstrahl() {
 }
 
 function renderZeitstrahlInhalt(liste, eingeloggt, container) {
-
   if (!liste || liste.length === 0) {
-    container.appendChild(Object.assign(document.createElement('p'), { textContent: 'Keine Daten.' }));
+    container.appendChild(Object.assign(document.createElement('p'),
+      { textContent: 'Keine Daten.', style: 'color:var(--muted);font-size:13px;' }));
     return container;
   }
 
   let aktiverUntertab = 'gantt';
+
+  // Wrapper für alles was zum Zeitstrahl gehört (Tabs + Inhalt)
+  const zeitstrahlWrapper = document.createElement('div');
+  container.appendChild(zeitstrahlWrapper);
+
   function renderUntertabs() {
-    const existing = container.querySelector('.zeitstrahl-inhalt');
-    if (existing) existing.remove();
+    zeitstrahlWrapper.innerHTML = '';
+
     const tabs = document.createElement('div');
     tabs.className = 'zeitstrahl-tabs kein-druck';
     tabs.innerHTML = `
@@ -886,14 +891,24 @@ function renderZeitstrahlInhalt(liste, eingeloggt, container) {
       <button class="zt-tab ${aktiverUntertab === 'timeline' ? 'aktiv' : ''}" data-zt="timeline">Timeline</button>`;
     tabs.appendChild(renderExportLeiste('zeitstrahl'));
     tabs.querySelectorAll('[data-zt]').forEach((btn) => {
-      btn.addEventListener('click', () => { aktiverUntertab = btn.dataset.zt; renderUntertabs(); });
+      btn.addEventListener('click', () => {
+        aktiverUntertab = btn.dataset.zt;
+        renderUntertabs();
+      });
     });
+
     const inhalt = document.createElement('div');
     inhalt.className = 'zeitstrahl-inhalt';
-    inhalt.appendChild(aktiverUntertab === 'gantt' ? renderGantt(liste, eingeloggt) : renderTimeline(liste, eingeloggt));
-    container.appendChild(tabs);
-    container.appendChild(inhalt);
+    inhalt.appendChild(
+      aktiverUntertab === 'gantt'
+        ? renderGantt(liste, eingeloggt)
+        : renderTimeline(liste, eingeloggt)
+    );
+
+    zeitstrahlWrapper.appendChild(tabs);
+    zeitstrahlWrapper.appendChild(inhalt);
   }
+
   renderUntertabs();
   return container;
 }

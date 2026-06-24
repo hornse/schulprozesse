@@ -89,13 +89,14 @@ async function ladePublicDashboard() {
 async function ladeAlles() {
   STATE.prozesse = await api('/api/prozesse');
 
-  // Aktiven Prozess bestimmen
+  // Aktiven Prozess bestimmen – immer den ersten als Standard,
+  // kein aktiv-Flag mehr nötig
   if (!STATE.aktiverProzess && STATE.prozesse.length > 0) {
-    STATE.aktiverProzess = STATE.prozesse.find((p) => p.aktiv) ?? STATE.prozesse[0];
-    STATE.prozessId = STATE.aktiverProzess.id;
+    STATE.aktiverProzess = STATE.prozesse[0];
+    STATE.prozessId      = STATE.aktiverProzess.id;
   } else if (STATE.prozessId) {
     STATE.aktiverProzess = STATE.prozesse.find((p) => p.id === STATE.prozessId) ?? STATE.prozesse[0];
-    STATE.prozessId = STATE.aktiverProzess?.id ?? null;
+    STATE.prozessId      = STATE.aktiverProzess?.id ?? null;
   }
 
   if (STATE.prozessId) {
@@ -1205,15 +1206,14 @@ function renderProzesseBlock() {
   block.innerHTML = `
     <h3 style="font-size:13px;color:var(--muted);">Prozesse</h3>
     <table class="admin-tabelle">
-      <thead><tr><th>Name</th><th>Aktiv</th><th>Öffentlich</th><th>Schritte</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Öffentlich</th><th>Schritte</th><th>Teilnehmer</th></tr></thead>
       <tbody>
         ${STATE.prozesse.map((p) => `
           <tr>
-            <td>${p.label}</td>
-            <td>${p.aktiv ? '✓' : ''}</td>
-            <td>${p.oeffentlich ? '🌐' : '🔒'}</td>
+            <td>${p.label}${p.beschreibung ? `<span style="font-size:11px;color:var(--muted);margin-left:6px;">${p.beschreibung}</span>` : ''}</td>
+            <td>${p.oeffentlich ? '🌐 öffentlich' : '🔒 privat'}</td>
             <td>${p.erledigt_anzahl ?? 0}/${p.schritt_anzahl ?? 0}</td>
-            <td>${p.aktiv ? '' : `<button class="btn-sekundaer btn" data-aktivieren="${p.id}">aktivieren</button>`}</td>
+            <td>${p.teilnehmer_anzahl ?? 0}</td>
           </tr>`).join('')}
       </tbody>
     </table>
@@ -1260,9 +1260,6 @@ function renderProzesseBlock() {
       <button class="btn" type="submit" style="width:auto;">Jetzt einfrieren</button>
     </form>`;
 
-  block.querySelectorAll('[data-aktivieren]').forEach((btn) => {
-    btn.addEventListener('click', () => aktiviereProzess(Number(btn.dataset.aktivieren)));
-  });
   block.querySelector('#neuer-prozess-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const label = block.querySelector('#prozess-label').value.trim();

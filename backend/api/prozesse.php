@@ -29,7 +29,7 @@ function handleListProzesse(PDO $db, array $config, array $input): void
                     (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1) as erledigt_anzahl,
                     (SELECT COUNT(*) FROM prozess_teilnehmer pt WHERE pt.prozess_id = p.id) as teilnehmer_anzahl,
                     "admin" as meine_rolle
-             FROM prozesse p ORDER BY p.aktiv DESC, p.erstellt_am DESC'
+        FROM prozesse p ORDER BY p.erstellt_am DESC'
         )->fetchAll();
     } else {
         $stmt = $db->prepare(
@@ -40,7 +40,7 @@ function handleListProzesse(PDO $db, array $config, array $input): void
                     pt.rolle as meine_rolle
              FROM prozesse p
              JOIN prozess_teilnehmer pt ON pt.prozess_id = p.id AND pt.webuntis_user = :u
-             ORDER BY p.aktiv DESC, p.erstellt_am DESC'
+             ORDER BY p.erstellt_am DESC'
         );
         $stmt->execute([':u' => $user['webuntis_user']]);
         $rows = $stmt->fetchAll();

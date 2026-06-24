@@ -24,8 +24,12 @@ require __DIR__ . '/../api/export.php';
 $route  = trim((string) ($_GET['route'] ?? ''), '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
-$rawBody = file_get_contents('php://input');
-$input   = $rawBody ? (json_decode($rawBody, true) ?? []) : [];
+// Query-Parameter und JSON-Body zusammenführen damit z.B.
+// ?prozess_id=2 die Handler erreicht (Body hat Vorrang bei Konflikten).
+$rawBody   = file_get_contents('php://input');
+$bodyInput = $rawBody ? (json_decode($rawBody, true) ?? []) : [];
+$getParams = array_diff_key($_GET, ['route' => true]);
+$input     = array_merge($getParams, $bodyInput);
 
 $routes = [
     ['POST',   '#^api/login$#',                                          'handleLogin'],

@@ -120,16 +120,15 @@ async function waehleProzess(id) {
   STATE.schritte       = [];
   STATE.offeneSchritte = new Set();
 
-  const res = await api(`/api/schritte?prozess_id=${id}`);
-  STATE.schritte = res.schritte;
-
-  const teilRes = await api(`/api/prozesse/${id}/teilnehmer`);
+  const [schrittRes, teilRes] = await Promise.all([
+    api(`/api/schritte?prozess_id=${id}`),
+    api(`/api/prozesse/${id}/teilnehmer`),
+  ]);
+  STATE.schritte   = schrittRes.schritte;
   STATE.teilnehmer = teilRes;
 
-  if (STATE.user?.rolle === 'admin') {
-    STATE.vorlagen = await api('/api/vorlagen');
-    STATE.phasen   = await api('/api/phasen');
-  }
+  // Public Dashboard neu laden damit Zeitstrahl korrekt ist
+  await ladePublicDashboard();
 
   render();
 }
@@ -391,10 +390,17 @@ function render() {
   $app.innerHTML = '';
   $app.appendChild(renderKopfleiste());
 
+  // Prozess-Tabs immer anzeigen wenn eingeloggt und mehrere Prozesse vorhanden
+  if (STATE.user && STATE.prozesse.length > 1) {
+    $app.appendChild(renderProzessTabs());
+  }
+
   if (STATE.ansicht === 'login') {
     $app.appendChild(renderLogin());
   } else if (STATE.ansicht === 'checkliste' && STATE.user) {
-    $app.appendChild(renderProzessTabs());
+    if (STATE.prozesse.length === 1) {
+      $app.appendChild(renderProzessTabs()); // auch bei einem Prozess anzeigen für Kontext
+    }
     $app.appendChild(renderChecklist());
   } else if (STATE.ansicht === 'zeitstrahl') {
     $app.appendChild(renderZeitstrahl());
@@ -403,9 +409,19 @@ function render() {
   }
 
   if (STATE.user) {
-    const kannVerwalten = STATE.user.rolle === 'admin' ||
-      STATE.teilnehmer.some((t) => t.webuntis_user === STATE.user.webuntis_user && t.rolle === 'verantwortlich');
-    if (kannVerwalten && STATE.prozessId) {
+    // Prozess verwalten für alle Prozesse anzeigen wo man Verantwortlicher ist
+    const verantwortlicheProzesse = STATE.prozesse.filter((p) => {
+      if (STATE.user.rolle === 'admin') return true;
+      // Teilnehmer-Check: wir haben nur die Teilnehmer des aktiven Prozesses geladen
+      // Für den aktiven Prozess direkt prüfen
+      if (p.id === STATE.prozessId) {
+        return STATE.teilnehmer.some((t) => t.webuntis_user === STATE.user.webuntis_user && t.rolle === 'verantwortlich');
+      }
+      // Für andere Prozesse: meine_rolle aus der Prozessliste nutzen
+      return p.meine_rolle === 'verantwortlich';
+    });
+
+    if (verantwortlicheProzesse.length > 0 && STATE.prozessId) {
       $app.appendChild(renderProzessVerwaltung());
     }
     if (STATE.user.rolle === 'admin') {
@@ -463,7 +479,7 @@ function renderProzessTabs() {
   const wrapper = document.createElement('div');
   wrapper.className = 'prozess-tabs kein-druck';
 
-  if (STATE.prozesse.length === 0) return wrapper;
+  if (!STATE.prozesse || STATE.prozesse.length === 0) return wrapper;
 
   STATE.prozesse.forEach((p) => {
     const tab = document.createElement('button');
@@ -471,7 +487,9 @@ function renderProzessTabs() {
     const schloss = p.oeffentlich ? '' : ' 🔒';
     tab.innerHTML = `${p.label}${schloss}`;
     tab.title = p.beschreibung || p.label;
-    tab.addEventListener('click', () => waehleProzess(p.id));
+    tab.addEventListener('click', () => {
+      if (p.id !== STATE.prozessId) waehleProzess(p.id);
+    });
     wrapper.appendChild(tab);
   });
 
@@ -514,14 +532,19 @@ function renderLogin() {
 // ============================================================================
 function renderDashboard() {
   const container = document.createElement('div');
-  const liste = STATE.user ? null : STATE.publicDashboard;
 
   if (STATE.user) {
-    // Eingeloggt: Dashboard des aktiven Prozesses
-    return renderDashboardFuerProzess(STATE.schritte, STATE.aktiverProzess?.label, true);
+    // Eingeloggt: Dashboard des aktuell gewählten Prozesses
+    if (!STATE.aktiverProzess) {
+      container.appendChild(Object.assign(document.createElement('p'),
+        { textContent: 'Kein Prozess zugewiesen. Bitte einen Admin bitten.' }));
+      return container;
+    }
+    return renderDashboardFuerProzess(STATE.schritte, STATE.aktiverProzess.label, true);
   }
 
-  // Öffentlich: Tabs je öffentlichem Prozess
+  // Öffentlich: alle öffentlichen Prozesse als Tabs
+  const liste = STATE.publicDashboard;
   if (!liste || liste.length === 0) {
     const p = document.createElement('p');
     p.textContent = 'Aktuell keine öffentlichen Prozesse.';
@@ -550,7 +573,6 @@ function renderDashboard() {
     tabs.appendChild(btn);
   });
   container.appendChild(tabs);
-
   const inhalt = document.createElement('div');
   inhalt.appendChild(renderDashboardFuerProzess(liste[0].schritte, liste[0].label, false));
   container.appendChild(inhalt);
@@ -809,10 +831,6 @@ function renderZeitstrahl() {
   const eingeloggt = !!STATE.user;
   const liste = eingeloggt ? STATE.schritte : (STATE.publicDashboard?.[0]?.schritte ?? []);
   const container = document.createElement('div');
-
-  if (eingeloggt && STATE.prozesse.length > 1) {
-    container.appendChild(renderProzessTabs());
-  }
 
   if (!liste || liste.length === 0) {
     container.appendChild(Object.assign(document.createElement('p'), { textContent: 'Keine Daten.' }));

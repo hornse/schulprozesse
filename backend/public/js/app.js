@@ -485,10 +485,17 @@ function renderProzessTabs() {
     const tab = document.createElement('button');
     tab.className = 'prozess-tab' + (p.id === STATE.prozessId ? ' aktiv' : '');
     const schloss = p.oeffentlich ? '' : ' 🔒';
-    tab.innerHTML = `${p.label}${schloss}`;
+    tab.textContent = p.label + schloss;
     tab.title = p.beschreibung || p.label;
-    tab.addEventListener('click', () => {
-      if (p.id !== STATE.prozessId) waehleProzess(p.id);
+    tab.addEventListener('click', async () => {
+      if (p.id === STATE.prozessId) return;
+      // Sofort visuelles Feedback: aktiven Tab wechseln
+      wrapper.querySelectorAll('.prozess-tab').forEach((t) => t.classList.remove('aktiv'));
+      tab.classList.add('aktiv');
+      tab.disabled = true;
+      tab.textContent = '⏳ ' + p.label + schloss;
+      await waehleProzess(p.id);
+      tab.disabled = false;
     });
     wrapper.appendChild(tab);
   });
@@ -829,8 +836,39 @@ function renderExportLeiste(typ) {
 // ============================================================================
 function renderZeitstrahl() {
   const eingeloggt = !!STATE.user;
-  const liste = eingeloggt ? STATE.schritte : (STATE.publicDashboard?.[0]?.schritte ?? []);
   const container = document.createElement('div');
+
+  if (!eingeloggt && STATE.publicDashboard && STATE.publicDashboard.length > 1) {
+    // Öffentlich mit mehreren Prozessen: Tabs anzeigen
+    let aktiverOeffentlicherIdx = 0;
+    const tabs = document.createElement('div');
+    tabs.className = 'prozess-tabs kein-druck';
+    const inhalt = document.createElement('div');
+
+    STATE.publicDashboard.forEach((p, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'prozess-tab' + (i === 0 ? ' aktiv' : '');
+      btn.textContent = p.label;
+      btn.addEventListener('click', () => {
+        aktiverOeffentlicherIdx = i;
+        tabs.querySelectorAll('.prozess-tab').forEach((b, j) => b.classList.toggle('aktiv', j === i));
+        inhalt.innerHTML = '';
+        renderZeitstrahlInhalt(p.schritte, false, inhalt);
+      });
+      tabs.appendChild(btn);
+    });
+    container.appendChild(tabs);
+    renderZeitstrahlInhalt(STATE.publicDashboard[0].schritte, false, inhalt);
+    container.appendChild(inhalt);
+    return container;
+  }
+
+  const liste = eingeloggt ? STATE.schritte : (STATE.publicDashboard?.[0]?.schritte ?? []);
+  renderZeitstrahlInhalt(liste, eingeloggt, container);
+  return container;
+}
+
+function renderZeitstrahlInhalt(liste, eingeloggt, container) {
 
   if (!liste || liste.length === 0) {
     container.appendChild(Object.assign(document.createElement('p'), { textContent: 'Keine Daten.' }));

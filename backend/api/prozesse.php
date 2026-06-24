@@ -65,7 +65,8 @@ function handleCreateProzess(PDO $db, array $config, array $input): void
 
     $db->beginTransaction();
     try {
-        $db->exec('UPDATE prozesse SET aktiv = 0');
+        // Kein aktiv=0 für alle anderen – mehrere Prozesse können gleichzeitig aktiv sein
+        // aktiv=1 bedeutet nur "wird zuerst angezeigt beim Laden"
 
         $db->prepare(
             'INSERT INTO prozesse (label, beschreibung, aktiv, oeffentlich, erstellt_von)
@@ -141,7 +142,8 @@ function handleActivateProzess(PDO $db, array $config, array $input, array $para
     Guard::requireAdmin($db);
     $id = (int) $params['id'];
 
-    $db->exec('UPDATE prozesse SET aktiv = 0');
+    // aktiv=1 setzt nur den Standard-Prozess (wird zuerst angezeigt)
+    // andere Prozesse bleiben wie sie sind
     $db->prepare('UPDATE prozesse SET aktiv = 1 WHERE id = :id')->execute([':id' => $id]);
     Response::json(['ok' => true]);
 }

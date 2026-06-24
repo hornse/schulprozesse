@@ -15,14 +15,15 @@ function handleListSchritte(PDO $db, array $config, array $input): void
     $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
 
     if (!$prozessId) {
-        // Aktiven Prozess finden dem der Nutzer zugewiesen ist
+        // Fallback: ersten Prozess des Nutzers nehmen (kein aktiv-Flag mehr)
         if ($user['rolle'] === 'admin') {
-            $row = $db->query('SELECT id FROM prozesse WHERE aktiv = 1 LIMIT 1')->fetch();
+            $row = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
         } else {
             $row = $db->prepare(
                 'SELECT p.id FROM prozesse p
                  JOIN prozess_teilnehmer pt ON pt.prozess_id = p.id
-                 WHERE p.aktiv = 1 AND pt.webuntis_user = :u LIMIT 1'
+                 WHERE pt.webuntis_user = :u
+                 ORDER BY p.erstellt_am DESC LIMIT 1'
             );
             $row->execute([':u' => $user['webuntis_user']]);
             $row = $row->fetch();

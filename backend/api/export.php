@@ -21,7 +21,7 @@ function handleListAktivitaeten(PDO $db, array $config, array $input): void
 
     $schuljahrId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
     if (!$schuljahrId) {
-        $schuljahrId = $db->query('SELECT id FROM prozesse WHERE aktiv = 1 LIMIT 1')->fetchColumn();
+        $schuljahrId = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetchColumn();
     }
 
     $stmt = $db->prepare(
@@ -42,7 +42,7 @@ function handleExportAktivitaeten(PDO $db, array $config, array $input): void
 
     $schuljahrId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
     if (!$schuljahrId) {
-        $row = $db->query('SELECT id, label FROM prozesse WHERE aktiv = 1 LIMIT 1')->fetch();
+        $row = $db->query('SELECT id, label FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
         $schuljahrId = $row ? (int) $row['id'] : null;
         $label = $row['label'] ?? 'export';
     } else {
@@ -97,7 +97,7 @@ function handleExportCsv(PDO $db, array $config, array $input): void
     $schuljahrId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
 
     if (!$schuljahrId) {
-        $row = $db->query('SELECT id FROM prozesse WHERE aktiv = 1 LIMIT 1')->fetch();
+        $row = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
         $schuljahrId = $row ? (int) $row['id'] : null;
     }
 

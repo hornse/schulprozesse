@@ -15,22 +15,22 @@ Bereitgestellt unter `prozesse.hornse.de`.
 ## Was die App kann
 
 - **Mehrere Prozesse gleichzeitig** – jeder Prozess (z. B. WebUntis-Wechsel, Abitur,
-  Geräteausgabe) läuft unabhängig mit eigener Checkliste und eigenen Teilnehmern
-- **Öffentliches Dashboard** – öffentliche Prozesse sind ohne Login sichtbar,
-  private Prozesse nur für zugewiesene Teilnehmer
+  Geräteausgabe) läuft unabhängig mit eigener Checkliste und eigenen Teilnehmern;
+  Wechsel per Tab-Leiste unter dem Header
+- **Öffentliches Dashboard** – öffentliche Prozesse ohne Login sichtbar, private nur
+  für zugewiesene Teilnehmer
 - **Checkliste** – Schritte abhaken, Verantwortliche sowie Start- und Zieldatum eintragen,
   Kommentare und weiterführende Infos mit Markdown-Formatierung
-- **Zeitstrahl** – Gantt- und Timeline-Ansicht, Zoom-Schieberegler (Tages- bis Wochenansicht),
-  SVG-Export
-- **Export** – Checkliste als CSV, Zeitstrahl als SVG-Vektorgrafik, beides als PDF druckbar
+- **Zeitstrahl** – Gantt- und Timeline-Ansicht, Zoom-Schieberegler (Tages- bis
+  Wochenansicht), dynamisch ausgedünnte Datumsachse, SVG-Export
+- **Export** – Checkliste als CSV, Zeitstrahl als SVG, beides als PDF druckbar
 - **Aktivitätsprotokoll** – wer hat wann was erledigt, als Tabelle und CSV
-- **Parallel-Erkennung** – Schritte mit überlappenden Zeiträumen automatisch markiert
-- **Teilnehmerverwaltung** – Verantwortliche können selbst Mitarbeitende zuweisen;
-  Admins verwalten alle Prozesse und Freigaben
-- **Prozess-Sichtbarkeit** – öffentlich (🌐) oder privat (🔒), schaltbar durch Verantwortliche
-- **Vorlagen-Snapshots** – aktuellen Stand einfrieren und als Basis für neue Prozesse nutzen
-- **Lokales Notfall-Passwort** – optionaler Login unabhängig von WebUntis, per SQL gesetzt
-- **Mobilansicht** – optimiertes Layout für kleine Bildschirme
+- **Teilnehmerverwaltung** – Verantwortliche können selbst Mitarbeitende zuweisen und
+  Phasen/Schritte ihres Prozesses verwalten
+- **Prozess-Sichtbarkeit** – öffentlich (🌐) oder privat (🔒)
+- **Vorlagen-Snapshots** – aktuellen Stand einfrieren und als Basis für neue Prozesse nutzen;
+  6 vorgefertigte Vorlagen enthalten
+- **Lokales Notfall-Passwort** – Login unabhängig von WebUntis, per SQL gesetzt
 
 ---
 
@@ -38,11 +38,21 @@ Bereitgestellt unter `prozesse.hornse.de`.
 
 | Aktion | Admin | Verantwortlicher | Mitarbeitender |
 |---|---|---|---|
-| Prozess anlegen/löschen | ✓ | – | – |
+| Prozess anlegen | ✓ | – | – |
 | Öffentlich/privat schalten | ✓ | ✓ (eigener) | – |
 | Teilnehmer verwalten | ✓ | ✓ (eigener) | – |
 | Phasen/Schritte verwalten | ✓ | ✓ (eigener) | – |
-| Häkchen, Felder, Kommentare | ✓ | ✓ | ✓ |
+| Häkchen, Daten, Kommentare | ✓ | ✓ | ✓ |
+
+---
+
+## Navigation
+
+Die App hat eine zweizeilige sticky Navigation:
+
+- **Zeile 1** – Schulname links, angemeldeter Benutzer + Abmelden rechts
+- **Zeile 2** – Dashboard · Checkliste · Zeitstrahl · Prozess verwalten · Admin
+- **Prozess-Tabs** – direkt darunter, wechselt Checkliste/Dashboard/Zeitstrahl
 
 ---
 
@@ -98,17 +108,13 @@ Für Uberspace-Deployment und ersten Admin-Eintrag siehe `docs/INSTALL.md`.
 
 ## Optionale Prozess-Vorlagen
 
-Im `migrations/`-Verzeichnis liegen fertige Vorlagen die optional eingespielt werden können:
+```bash
+# Alle 6 Vorlagen als fertige Snapshots einspielen:
+sqlite3 data/app.sqlite < migrations/seed_vorlagen_snapshots.sql
+```
 
-- `seed_schuljahresbeginn.sql` – Schuljahresbeginn allgemein
-- `seed_schuljahresabschluss.sql` – Schuljahresabschluss
-- `seed_abitur.sql` – Abitur-Organisation
-- `seed_geraeteausgabe.sql` – iPad- und Geräteausgabe
-- `seed_dsgvo.sql` – DSGVO-Jahresprüfung
-- `seed_studientag.sql` – Studientag-Organisation
-
-Nach dem Einspielen einer Vorlage in der App unter „Vorlagen-Snapshots → Jetzt einfrieren"
-einen Snapshot erstellen und beim Anlegen eines neuen Prozesses als Basis wählen.
+Enthaltene Vorlagen: Schuljahresbeginn, Schuljahresabschluss, Abitur-Organisation,
+iPad- und Geräteausgabe, DSGVO-Jahresprüfung, Studientag-Organisation.
 
 ---
 

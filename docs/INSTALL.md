@@ -7,7 +7,7 @@
 ### Schritt 1 – ZIP entpacken und Verzeichnis vorbereiten
 
 Das heruntergeladene ZIP enthält einen Ordner `schulprozesse/`. Diesen in
-ein sinnvolles Verzeichnis auf deinem Rechner entpacken, z. B.:
+ein sinnvolles Verzeichnis auf dem Rechner entpacken, z. B.:
 
 ```
 ~/Projekte/schulprozesse/
@@ -17,11 +17,10 @@ ein sinnvolles Verzeichnis auf deinem Rechner entpacken, z. B.:
 
 1. IntelliJ IDEA starten
 2. „Open" klicken und den entpackten Ordner `schulprozesse/` auswählen
-3. IntelliJ erkennt es als normales Verzeichnis (kein Framework nötig)
 
 ### Schritt 3 – Git initialisieren
 
-Im Terminal unten in IntelliJ (oder in einem externen Terminal im Projektordner):
+Im Terminal unten in IntelliJ:
 
 ```bash
 git init
@@ -32,12 +31,10 @@ git commit -m "Initial commit: Schulprozesse"
 ### Schritt 4 – GitHub-Repository anlegen
 
 1. github.com → „New repository"
-2. Name: `schulprozesse`
-3. Sichtbarkeit: Public oder Private (Public = andere Schulen können es nutzen)
-4. **Kein** README, .gitignore oder Lizenz hinzufügen (ist schon im Projekt)
-5. „Create repository" klicken
-6. GitHub zeigt danach die Remote-URL, z. B.:
-   `https://github.com/hornse/schulprozesse.git`
+2. Name: `schulprozesse`, Sichtbarkeit wählen
+3. Kein README, .gitignore oder Lizenz hinzufügen
+4. „Create repository" klicken
+5. Remote-URL notieren (z. B. `https://github.com/hornse/schulprozesse.git`)
 
 ### Schritt 5 – Remote hinzufügen und pushen
 
@@ -46,15 +43,11 @@ git remote add github https://github.com/hornse/schulprozesse.git
 git push -u github main
 ```
 
-In IntelliJ: Git → Push (oder `Strg+Shift+K`) funktioniert danach auch.
-
 ---
 
 ## Teil 2: Uberspace einrichten (prozesse.hornse.de)
 
 ### Schritt 6 – Bare repo auf Uberspace anlegen
-
-Per SSH auf dem Server:
 
 ```bash
 mkdir -p ~/repos/schulprozesse.git
@@ -63,7 +56,9 @@ git init --bare
 
 cat > hooks/post-receive << 'EOF'
 #!/bin/bash
-GIT_WORK_TREE=/var/www/virtual/hornse/schulprozesse-src git checkout -f main
+GIT_WORK_TREE=/var/www/virtual/hornse/schulprozesse-src \
+GIT_DIR=/home/hornse/repos/schulprozesse.git \
+git checkout -f main
 EOF
 chmod +x hooks/post-receive
 ```
@@ -74,7 +69,7 @@ chmod +x hooks/post-receive
 git remote add uberspace hornse@halimede.uberspace.de:repos/schulprozesse.git
 ```
 
-Ab jetzt deployen mit:
+Deployen ab jetzt mit:
 ```bash
 git push github main && git push uberspace main
 ```
@@ -88,7 +83,7 @@ cd /var/www/virtual/hornse
 ln -s schulprozesse-src/backend/public prozesse.hornse.de
 ```
 
-Wichtig: der Symlink muss Geschwister von `html/` sein, nicht darin.
+Der Symlink muss Geschwister von `html/` sein, nicht darin.
 
 ### Schritt 9 – Konfiguration anlegen
 
@@ -112,6 +107,7 @@ Mindestens setzen:
 
 ```bash
 cd /var/www/virtual/hornse/schulprozesse-src
+mkdir -p data
 sqlite3 data/app.sqlite < migrations/001_init.sql
 sqlite3 data/app.sqlite < migrations/002_seed_schritte.sql
 ```
@@ -123,43 +119,28 @@ sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
   "INSERT INTO benutzer_rollen (webuntis_user, anzeigename, rolle)
    VALUES ('DEIN_KUERZEL', 'Dein Name', 'admin');"
 
-# Admin auch als Teilnehmer des ersten Prozesses eintragen
 sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
   "INSERT INTO prozess_teilnehmer (prozess_id, webuntis_user, rolle)
    VALUES (1, 'DEIN_KUERZEL', 'verantwortlich');"
 ```
 
-Danach auf `https://prozesse.hornse.de` einloggen – der Admin-Bereich
-erscheint am Ende der Seite.
+Dann `https://prozesse.hornse.de` aufrufen und einloggen.
 
 ---
 
 ## Optionale Prozess-Vorlagen einspielen
 
-Jede Vorlage legt neue Phasen und Schritte in der Vorlagentabelle an.
-Nach dem Einspielen in der App unter „Vorlagen-Snapshots → Jetzt einfrieren"
-einen Snapshot erstellen, dann beim Anlegen eines neuen Prozesses als Basis wählen.
-
 ```bash
-# Beispiel: Abitur-Vorlage einspielen
 sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
-  < /var/www/virtual/hornse/schulprozesse-src/migrations/seed_abitur.sql
+  < /var/www/virtual/hornse/schulprozesse-src/migrations/seed_vorlagen_snapshots.sql
 ```
 
-Verfügbare Vorlagen:
-
-| Datei | Inhalt |
-|---|---|
-| `seed_schuljahresbeginn.sql` | Schuljahresbeginn allgemein (15 Schritte) |
-| `seed_schuljahresabschluss.sql` | Schuljahresabschluss (14 Schritte) |
-| `seed_abitur.sql` | Abitur-Organisation (17 Schritte) |
-| `seed_geraeteausgabe.sql` | iPad- und Geräteausgabe (16 Schritte) |
-| `seed_dsgvo.sql` | DSGVO-Jahresprüfung (15 Schritte) |
-| `seed_studientag.sql` | Studientag-Organisation (14 Schritte) |
+Legt 6 fertige Snapshots an, die sofort im Dropdown „Basis wählen" erscheinen.
+Die aktive Vorlagentabelle wird dabei nicht verändert.
 
 ---
 
-## Lokales Notfall-Passwort setzen (optional)
+## Lokales Notfall-Passwort (optional)
 
 Unabhängiger lokaler Benutzer der auch ohne WebUntis funktioniert:
 
@@ -172,7 +153,6 @@ sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
   "INSERT INTO benutzer_rollen (webuntis_user, anzeigename, rolle, passwort_hash)
    VALUES ('notfalladmin', 'Notfall Admin', 'admin', 'HASH_VON_OBEN');"
 
-# Auch als Teilnehmer aller gewünschten Prozesse eintragen
 sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
   "INSERT INTO prozess_teilnehmer (prozess_id, webuntis_user, rolle)
    VALUES (1, 'notfalladmin', 'verantwortlich');"
@@ -183,13 +163,12 @@ sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
 ## Laufender Betrieb
 
 ```bash
-# Änderungen deployen
 git add -A
-git commit -m "Beschreibung der Änderung"
+git commit -m "Beschreibung"
 git push github main && git push uberspace main
 ```
 
-Keine Migrationen nötig – das Schema ist vollständig in `001_init.sql`.
+Kein Migrationsschritt nötig – das Schema ist vollständig in `001_init.sql`.
 
 ---
 
@@ -197,5 +176,6 @@ Keine Migrationen nötig – das Schema ist vollständig in `001_init.sql`.
 
 | Datei | Inhalt |
 |---|---|
-| `001_init.sql` | Vollständiges Schema inkl. prozesse, prozess_teilnehmer, alle Tabellen |
-| `002_seed_schritte.sql` | 13 Standard-Schritte für den WebUntis-Schuljahreswechsel + erster Prozess |
+| `001_init.sql` | Vollständiges Schema |
+| `002_seed_schritte.sql` | 13 WebUntis-Schritte + erster Prozess |
+| `seed_vorlagen_snapshots.sql` | 6 fertige Prozess-Vorlagen als Snapshots |

@@ -1,12 +1,23 @@
 # Benutzerhandbuch
 
-## Übersicht der Ansichten
+---
 
-Die App hat drei Tabs:
+## Navigation
 
-- **Dashboard** – öffentliche Statusübersicht ohne Anmeldung (nur öffentliche Prozesse)
-- **Zeitstrahl** – Gantt- und Timeline-Ansicht, öffentlich sichtbar
-- **Checkliste** – nur nach Anmeldung, mit allen Details und Bearbeitungsmöglichkeiten
+Die App hat eine zweizeilige sticky Navigation oben:
+
+**Zeile 1** – Schulname links, angemeldeter Benutzer mit Rolle-Badge und
+Abmelden-Button rechts.
+
+**Zeile 2** – Hauptnavigation:
+- **Dashboard** – öffentliche Statusübersicht, immer sichtbar
+- **Checkliste** – nur nach Anmeldung
+- **Zeitstrahl** – Gantt und Timeline, immer sichtbar
+- **Prozess verwalten** – für Verantwortliche und Admins
+- **Admin** – nur für Admins
+
+**Prozess-Tabs** – direkt unter der Navigation, zeigt alle Prozesse denen
+man zugewiesen ist. Klick wechselt den Prozess in allen Ansichten.
 
 ---
 
@@ -14,11 +25,11 @@ Die App hat drei Tabs:
 
 Zeigt ohne Anmeldung alle öffentlichen Prozesse als separate Tabs. Pro Prozess:
 - Welcher Schritt gerade dran ist
-- Überfällige Schritte (Zieldatum überschritten, noch nicht erledigt)
-- Schritte, die in den nächsten 14 Tagen fällig sind
-- Fortschritt je Phase als Balken
+- Überfällige Schritte
+- Schritte die in den nächsten 14 Tagen fällig sind
+- Fortschritt je Phase
 
-Nicht öffentlich sichtbar: Verantwortliche, Kommentare, private Prozesse.
+Nicht öffentlich: Verantwortliche, Kommentare, private Prozesse.
 
 ---
 
@@ -27,111 +38,95 @@ Nicht öffentlich sichtbar: Verantwortliche, Kommentare, private Prozesse.
 Zwei Untertabs:
 
 **Gantt:** Horizontale Ansicht mit Datumsachse. Schritte mit Start- und
-Zieldatum erscheinen als durchgehender farbiger Balken, Schritte mit nur
-einem Zieldatum als Punkt. Zoom-Schieberegler (1–7 Tage/Spalte).
+Zieldatum als Balken, nur Zieldatum als Punkt. Zoom-Schieberegler
+(1–7 Tage/Spalte) – die Datumsachse wird automatisch ausgedünnt damit
+die Labels nicht überlappen.
 
-**Timeline:** Chronologische Liste mit Datums-Trennlinien. Zeigt bei Schritten
-mit Startdatum einen „ab TT.MM."-Hinweis.
+**Timeline:** Chronologische Liste mit Datums-Trennlinien.
 
-**Export:** ⬇ SVG exportiert den Zeitstrahl als Vektorgrafik. 🖨 Drucken öffnet
-den Browser-Druckdialog.
+**Export:** ⬇ SVG und 🖨 Drucken oben in der Tab-Leiste.
 
 ---
 
 ## Anmeldung
 
-Über den Button „Anmelden" oben rechts mit den WebUntis-Zugangsdaten.
-Ein korrektes Passwort allein reicht nicht – die Person muss zusätzlich von
-einem Admin freigegeben worden sein.
-
-Nach der Anmeldung erscheinen alle Prozesse als Tabs, denen die Person
-zugewiesen ist.
+Über den „Anmelden"-Button oben rechts mit WebUntis-Zugangsdaten.
+Ein korrektes Passwort allein reicht nicht – die Person muss von einem
+Admin freigegeben und einem Prozess zugewiesen sein.
 
 ---
 
 ## Checkliste (nach Anmeldung)
 
-Über den Tab „Checkliste" erreichbar. Jeden Schritt anklicken, um Details
-aufzuklappen:
+Zeigt den aktuell gewählten Prozess (Prozess-Tab oben). Jeden Schritt
+anklicken zum Aufklappen:
 
-**Häkchen** – setzt den Schritt auf erledigt. Wird im Aktivitätsprotokoll
-aufgezeichnet.
+**Häkchen** – erledigt setzen, wird protokolliert.
 
-**Verantwortlich** – Freitext, wer diesen Schritt übernimmt.
+**Verantwortlich** – wer diesen Schritt übernimmt.
 
-**Start** – optionales Startdatum. Zusammen mit dem Zieldatum wird ein
-Zeitraum definiert, der im Gantt als Balken dargestellt wird.
+**Start / Zieldatum** – Zeitraum für den Gantt-Balken.
 
-**Zieldatum** – geplantes Enddatum. Schritte mit überlappenden Zeiträumen
-werden automatisch als parallel erkannt.
+**Kommentar** – prozessspezifische Kurznotiz, nur für Angemeldete.
 
-**Parallel möglich** – manuelles Flag für diesen Prozess.
+**Weiterführende Infos** – Markdown-Hinweise von Admins/Verantwortlichen.
 
-**Kommentar** – prozessspezifische Kurznotiz, nur für angemeldete Personen.
-
-**Weiterführende Infos** – von Admins oder Verantwortlichen hinterlegte
-Hinweise (Markdown), nur für Angemeldete sichtbar.
-
-Alle Felder speichern automatisch beim Verlassen. Datumsfelder und der
-Parallel-Toggle aktualisieren den Zeitstrahl sofort.
-
-**Export:** ⬇ CSV lädt die vollständige Checkliste herunter (öffnet direkt
-in Excel). 🖨 PDF öffnet den Browser-Druckdialog.
+**Export:** ⬇ CSV und 🖨 PDF über die Schaltflächen oberhalb der Liste.
 
 ---
 
-## Prozess verwalten (Verantwortliche)
+## Prozess verwalten (Verantwortliche + Admins)
 
-Wer für einen Prozess als „Verantwortlich" eingetragen ist, sieht nach
-der Anmeldung den Bereich „Prozess verwalten":
+Eigene Seite über den Tab „Prozess verwalten" in der Navigation.
+Immer auf den aktuell gewählten Prozess (Prozess-Tab) bezogen.
 
-**Sichtbarkeit:** 🌐 Öffentlich (im Dashboard für alle sichtbar) oder
-🔒 Privat (nur für Teilnehmer). Per Toggle umschaltbar.
+**Sichtbarkeit:** 🌐 Öffentlich oder 🔒 Privat umschalten.
 
-**Teilnehmer:** Mitarbeitende hinzufügen (Kürzel eingeben + Rolle wählen),
-Rollen ändern, Teilnehmer entfernen. Nur Personen die bereits unter
-„Zugriff" freigegeben sind können hinzugefügt werden.
+**Teilnehmer:** Kürzel eingeben, Rolle wählen (verantwortlich/mitarbeitend),
+hinzufügen. Rollen ändern oder Teilnehmer entfernen. Nur Personen die
+bereits unter „Zugriff" freigegeben sind, können hinzugefügt werden.
 
----
-
-## Admin-Bereich
-
-Erscheint nach Anmeldung mit der Rolle „admin" am Ende der Seite.
-
-### Prozesse
-
-**Neuen Prozess anlegen:**
-- Name eingeben (z. B. „Abitur 2027")
-- Beschreibung optional
-- Basis wählen: aktuelle Vorlage oder ein gespeicherter Snapshot
-- Sichtbarkeit: öffentlich oder privat
-- Der Anleger wird automatisch als Verantwortlicher eingetragen
-
-**Prozess aktivieren:** Markiert einen Prozess als aktiv (wird zuerst in
-der Tab-Leiste angezeigt).
-
-### Vorlagen-Snapshots
-
-**Jetzt einfrieren:** Speichert den aktuellen Stand aller Phasen und
-aktiven Schritte als benannten Snapshot. Dient als Basis für neue Prozesse
-mit derselben Struktur.
-
-### Zugriff
-
-Nur Personen in dieser Liste können sich anmelden. Kürzel eingeben,
-Name und Rolle (mitglied/admin) setzen, dann „Freigeben". Danach in
-„Prozess verwalten" als Teilnehmer des jeweiligen Prozesses zuweisen.
-
-### Vorlage verwalten
-
-Phasen und Schritte der Standard-Vorlage pflegen:
-- Phasen per Drag-and-Drop umsortieren, umbenennen, einfärben
+**Phasen und Schritte verwalten:** Verantwortliche können direkt auf dieser
+Seite die Phasen und Schritte ihres Prozesses bearbeiten:
+- Phasen per ⠿-Griff umsortieren, umbenennen, einfärben
 - Schritte hinzufügen, bearbeiten, umsortieren, deaktivieren
 - Weiterführende Infos mit Markdown und Live-Vorschau
 
+---
+
+## Admin-Bereich (nur Admins)
+
+Eigene Seite über den Tab „Admin" in der Navigation.
+
+### Prozesse
+
+Übersicht aller Prozesse. Neuen Prozess anlegen:
+- Name und optionale Beschreibung
+- Sichtbarkeit: öffentlich oder privat
+- Basis: aktuelle Vorlage, leer starten oder ein Snapshot
+
+Der Anleger wird automatisch als Verantwortlicher eingetragen.
+
+### Vorlagen-Snapshots
+
+**Jetzt einfrieren:** Speichert alle aktiven Phasen und Schritte als
+benannten Snapshot. Dient als Basis für neue Prozesse.
+
+6 vorgefertigte Snapshots können mit `seed_vorlagen_snapshots.sql`
+eingespielt werden (siehe INSTALL.md).
+
+### Zugriff
+
+Personen freigeben damit sie sich anmelden können. Danach in
+„Prozess verwalten" als Teilnehmer zuweisen.
+
+### Vorlage verwalten
+
+Phasen und Schritte der Standard-WebUntis-Vorlage pflegen.
+
 ### Aktivitätsprotokoll
 
-Zeigt die letzten 200 Aktionen des aktiven Prozesses. CSV-Export verfügbar.
+Letzte 200 Aktionen des aktuellen Prozesses, als CSV exportierbar.
 
 ---
 
@@ -144,5 +139,5 @@ eingerichtet werden. Genaue Befehle siehe `docs/INSTALL.md`.
 
 ## Was die App (noch) nicht kann
 
-- Keine E-Mail-Erinnerungen bei überfälligen Schritten
-- Kein Zeitstrahl für abgeschlossene Prozesse (nur Checkliste)
+- Keine E-Mail-Erinnerungen
+- Kein Zeitstrahl für abgeschlossene Prozesse

@@ -483,7 +483,10 @@ main{
 .gantt-schritt-label{ color:var(--ink); }
 .gantt-schritt-label.erledigt{ color:var(--muted); text-decoration:line-through; }
 .gantt-raster{ display:grid; flex:1; min-width:0; }
-.gantt-tag{ font-size:9px; color:var(--muted); text-align:center; padding:2px 0; }
+.gantt-tag{
+  font-size:9px; color:var(--muted); text-align:center; padding:2px 1px;
+  min-width:22px;
+}
 .gantt-tag.gantt-heute{ color:var(--accent); font-weight:700; }
 .gantt-zelle{
   height:22px; border-left:1px solid #eee; position:relative;

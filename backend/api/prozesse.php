@@ -56,7 +56,10 @@ function handleCreateProzess(PDO $db, array $config, array $input): void
     $label       = trim((string) ($input['label'] ?? ''));
     $beschreibung = $input['beschreibung'] ?? null;
     $oeffentlich = isset($input['oeffentlich']) ? (int) (bool) $input['oeffentlich'] : 1;
-    $setId       = isset($input['set_id']) ? (int) $input['set_id'] : null;
+    $setId = isset($input['set_id']) ? $input['set_id'] : null;
+    // 'leer' = leerer Prozess ohne Schritte; null = aktuelle Vorlage; int = Snapshot
+    $leer  = $setId === 'leer';
+    $setId = (!$leer && $setId !== null) ? (int) $setId : null;
 
     if ($label === '') Response::error('label ist erforderlich.', 400);
 
@@ -81,7 +84,9 @@ function handleCreateProzess(PDO $db, array $config, array $input): void
         )->execute([':p' => $prozessId, ':u' => $user['webuntis_user']]);
 
         // Instanzen anlegen
-        if ($setId) {
+        if ($leer) {
+            // Leerer Prozess – keine Schritte, Admin trägt sie selbst ein
+        } elseif ($setId) {
             // Aus Snapshot
             _instanzenAusSnapshot($db, $prozessId, $setId);
         } else {

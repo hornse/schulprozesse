@@ -429,7 +429,12 @@ function renderKopfleiste() {
       <button class="tab ${STATE.ansicht === 'checkliste' ? 'aktiv' : ''}" data-ansicht="checkliste">Checkliste</button>
       <button class="tab ${STATE.ansicht === 'zeitstrahl' ? 'aktiv' : ''}" data-ansicht="zeitstrahl">Zeitstrahl</button>
     `;
-    rechtsHtml = `<button class="btn btn-sekundaer" id="logout-btn">Abmelden</button>`;
+    rechtsHtml = `
+      <div class="header-user">
+        <span class="header-user-name">${STATE.user.anzeigename}</span>
+        <span class="header-user-rolle ${STATE.user.rolle === 'admin' ? 'footer-rolle-admin' : 'footer-rolle-mitglied'}">${STATE.user.rolle}</span>
+        <button class="btn btn-sekundaer" id="logout-btn">Abmelden</button>
+      </div>`;
   } else if (STATE.ansicht === 'login') {
     tabsHtml = `<button class="tab" data-ansicht="dashboard">Dashboard</button>`;
     rechtsHtml = `<button class="btn btn-sekundaer" id="abbrechen-btn">Abbrechen</button>`;
@@ -1149,7 +1154,8 @@ function renderProzesseBlock() {
         <input type="text" id="prozess-beschreibung" style="width:100%;"></div>
       <div class="feld"><label>Basis</label>
         <select id="prozess-set">
-          <option value="">Aktuelle Vorlage</option>
+          <option value="">Aktuelle Vorlage (WebUntis-Wechsel)</option>
+          <option value="leer">⬜ Leer starten (keine Schritte)</option>
           ${STATE.vorlagenSets.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}
         </select>
       </div>
@@ -1190,9 +1196,10 @@ function renderProzesseBlock() {
     e.preventDefault();
     const label = block.querySelector('#prozess-label').value.trim();
     const beschreibung = block.querySelector('#prozess-beschreibung').value.trim() || null;
-    const setId = block.querySelector('#prozess-set').value || null;
+    const setId = block.querySelector('#prozess-set').value;
+    const setIdWert = setId === '' ? null : setId === 'leer' ? 'leer' : Number(setId);
     const oeffentlich = Number(block.querySelector('#prozess-oeffentlich').value);
-    if (label) neuerProzess(label, beschreibung, oeffentlich, setId);
+    if (label) neuerProzess(label, beschreibung, oeffentlich, setIdWert);
   });
   block.querySelector('#neuer-snapshot-form').addEventListener('submit', (e) => {
     e.preventDefault();

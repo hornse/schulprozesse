@@ -84,6 +84,10 @@ footer{ padding:14px 20px; text-align:center; font-size:12px; color:var(--muted)
 /* --- Schritte --- */
 .phase-title{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; margin:18px 0 8px; }
 
+.header-user{ display:flex; align-items:center; gap:8px; }
+.header-user-name{ font-size:13px; font-weight:500; color:var(--ink); }
+.header-user-rolle{ font-size:10px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase; padding:1px 6px; border-radius:4px; letter-spacing:.04em; }
+
 /* --- Prozess-Tabs --- */
 .prozess-tabs{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--line); }
 .prozess-tab{

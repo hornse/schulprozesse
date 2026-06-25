@@ -110,6 +110,7 @@ cd /var/www/virtual/hornse/schulprozesse-src
 mkdir -p data
 sqlite3 data/app.sqlite < migrations/001_init.sql
 sqlite3 data/app.sqlite < migrations/002_seed_schritte.sql
+sqlite3 data/app.sqlite < migrations/003_einstellungen.sql
 ```
 
 ### Schritt 11 – Ersten Admin eintragen
@@ -178,4 +179,5 @@ Kein Migrationsschritt nötig – das Schema ist vollständig in `001_init.sql`.
 |---|---|
 | `001_init.sql` | Vollständiges Schema |
 | `002_seed_schritte.sql` | 13 WebUntis-Schritte + erster Prozess |
+| `003_einstellungen.sql` | Erscheinungsbild-Einstellungen mit Standardwerten |
 | `seed_vorlagen_snapshots.sql` | 6 fertige Prozess-Vorlagen als Snapshots |

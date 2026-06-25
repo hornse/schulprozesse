@@ -1,143 +1,150 @@
 # Benutzerhandbuch
 
+Dieses Handbuch richtet sich an alle Nutzergruppen: neue Kolleg:innen,
+Verantwortliche und Admins.
+
+---
+
+## Für neue Nutzer: Schnelleinstieg
+
+Die App hat eine eingebaute **Hilfe-Seite** (Tab „?" in der Navigation) die
+ohne Anmeldung zugänglich ist. Dort finden sich Erste Schritte und ein FAQ.
+
+Kurzübersicht:
+
+1. URL der App aufrufen
+2. Oben rechts „Anmelden" klicken
+3. WebUntis-Zugangsdaten eingeben
+4. Falls der Login scheitert: Admin der App um Freischaltung bitten
+
 ---
 
 ## Navigation
 
-Die App hat eine zweizeilige sticky Navigation oben:
+**Zweizeiliger Header** – oben sticky:
 
-**Zeile 1** – Schulname links, angemeldeter Benutzer mit Rolle-Badge und
-Abmelden-Button rechts.
+- **Zeile 1** – Schullogo + Schulname links, angemeldeter Benutzer mit
+  Rolle-Badge und Abmelden rechts
+- **Zeile 2** – Haupttabs: Dashboard · Checkliste · Zeitstrahl ·
+  Prozess verwalten (Verantwortliche/Admin) · Admin · Hilfe
 
-**Zeile 2** – Hauptnavigation:
-- **Dashboard** – öffentliche Statusübersicht, immer sichtbar
-- **Checkliste** – nur nach Anmeldung
-- **Zeitstrahl** – Gantt und Timeline, immer sichtbar
-- **Prozess verwalten** – für Verantwortliche und Admins
-- **Admin** – nur für Admins
-
-**Prozess-Tabs** – direkt unter der Navigation, zeigt alle Prozesse denen
-man zugewiesen ist. Klick wechselt den Prozess in allen Ansichten.
+**Prozess-Tabs** – direkt unter dem Header, wechselt in allen Ansichten
+gleichzeitig den aktiven Prozess.
 
 ---
 
-## Dashboard (öffentlich)
+## Hilfe-Seite (ohne Login zugänglich)
 
-Zeigt ohne Anmeldung alle öffentlichen Prozesse als separate Tabs. Pro Prozess:
+Über den „?"-Tab in der Navigation. Zwei Bereiche:
+
+**Erste Schritte** – geführte Einführung in 6 Karten: Was ist die App?,
+Anmeldung, Prozess-Tabs, Schritte erledigen, Ansichten, Ansprechpartner.
+
+**FAQ** – 10 aufklappbare Fragen zu häufigen Problemen und Missverständnissen,
+z. B. Anmeldung schlägt fehl, versehentliches Häkchen, Datenschutz.
+
+---
+
+## Dashboard
+
+Zeigt ohne Anmeldung alle öffentlichen Prozesse. Nach Anmeldung den
+aktuell gewählten Prozess mit:
 - Welcher Schritt gerade dran ist
-- Überfällige Schritte
-- Schritte die in den nächsten 14 Tagen fällig sind
-- Fortschritt je Phase
+- Überfällige Schritte (Zieldatum überschritten)
+- Schritte in den nächsten 14 Tagen
+- Fortschritt je Phase als Balken
 
-Nicht öffentlich: Verantwortliche, Kommentare, private Prozesse.
-
----
-
-## Zeitstrahl (öffentlich, erweitert nach Anmeldung)
-
-Zwei Untertabs:
-
-**Gantt:** Horizontale Ansicht mit Datumsachse. Schritte mit Start- und
-Zieldatum als Balken, nur Zieldatum als Punkt. Zoom-Schieberegler
-(1–7 Tage/Spalte) – die Datumsachse wird automatisch ausgedünnt damit
-die Labels nicht überlappen.
-
-**Timeline:** Chronologische Liste mit Datums-Trennlinien.
-
-**Export:** ⬇ SVG und 🖨 Drucken oben in der Tab-Leiste.
+Kommentare und Verantwortliche sind nur nach Anmeldung sichtbar.
 
 ---
 
-## Anmeldung
+## Zeitstrahl
 
-Über den „Anmelden"-Button oben rechts mit WebUntis-Zugangsdaten.
-Ein korrektes Passwort allein reicht nicht – die Person muss von einem
-Admin freigegeben und einem Prozess zugewiesen sein.
+**Gantt** – Horizontale Tabelle mit gemeinsamer Datumsachse für alle Zeilen.
+Schritte mit Start + Zieldatum als Balken, nur Zieldatum als Punkt.
+Zoom-Schieberegler (1–7 Tage/Spalte).
+
+**Timeline** – Chronologische Liste nach Zieldatum sortiert.
+
+**Export** – ⬇ SVG und 🖨 Drucken oben in der Tab-Leiste.
 
 ---
 
 ## Checkliste (nach Anmeldung)
 
-Zeigt den aktuell gewählten Prozess (Prozess-Tab oben). Jeden Schritt
-anklicken zum Aufklappen:
+Jeden Schritt anklicken zum Aufklappen:
 
-**Häkchen** – erledigt setzen, wird protokolliert.
+- **Häkchen** – als erledigt markieren, wird im Aktivitätsprotokoll gespeichert
+- **Verantwortlich** – Freitext, wer diesen Schritt übernimmt
+- **Start / Zieldatum** – Zeitraum für den Gantt-Balken
+- **Kommentar** – prozessspezifische Notiz, nur für Angemeldete sichtbar
+- **Weiterführende Infos** – Markdown-Hinweise von Admins/Verantwortlichen
 
-**Verantwortlich** – wer diesen Schritt übernimmt.
+Alle Felder speichern automatisch beim Verlassen. Datumsfelder und
+Parallel-Toggle aktualisieren den Zeitstrahl sofort.
 
-**Start / Zieldatum** – Zeitraum für den Gantt-Balken.
-
-**Kommentar** – prozessspezifische Kurznotiz, nur für Angemeldete.
-
-**Weiterführende Infos** – Markdown-Hinweise von Admins/Verantwortlichen.
-
-**Export:** ⬇ CSV und 🖨 PDF über die Schaltflächen oberhalb der Liste.
+**Export** – ⬇ CSV (öffnet in Excel) und 🖨 PDF oberhalb der Liste.
 
 ---
 
 ## Prozess verwalten (Verantwortliche + Admins)
 
-Eigene Seite über den Tab „Prozess verwalten" in der Navigation.
-Immer auf den aktuell gewählten Prozess (Prozess-Tab) bezogen.
+Eigener Tab in der Navigation, bezogen auf den aktiven Prozess-Tab.
 
-**Sichtbarkeit:** 🌐 Öffentlich oder 🔒 Privat umschalten.
+**Sichtbarkeit** – 🌐 Öffentlich oder 🔒 Privat umschalten.
 
-**Teilnehmer:** Kürzel eingeben, Rolle wählen (verantwortlich/mitarbeitend),
-hinzufügen. Rollen ändern oder Teilnehmer entfernen. Nur Personen die
-bereits unter „Zugriff" freigegeben sind, können hinzugefügt werden.
+**Teilnehmer** – Kürzel eingeben, Rolle wählen (verantwortlich/mitarbeitend),
+hinzufügen. Nur Personen die unter „Zugriff" freigegeben sind, können
+zugewiesen werden.
 
-**Phasen und Schritte verwalten:** Verantwortliche können direkt auf dieser
-Seite die Phasen und Schritte ihres Prozesses bearbeiten:
-- Phasen per ⠿-Griff umsortieren, umbenennen, einfärben
-- Schritte hinzufügen, bearbeiten, umsortieren, deaktivieren
-- Weiterführende Infos mit Markdown und Live-Vorschau
+**Phasen und Schritte** – Verantwortliche können direkt hier Phasen und
+Schritte ihres Prozesses bearbeiten: umsortieren (Drag-and-Drop), umbenennen,
+einfärben, neue Schritte anlegen, Schritte deaktivieren.
 
 ---
 
 ## Admin-Bereich (nur Admins)
 
-Eigene Seite über den Tab „Admin" in der Navigation.
+Eigener Tab in der Navigation.
+
+### Erscheinungsbild
+
+Schulname, App-Titel, Primär- und Sekundärfarbe, Logo (PNG/JPG/SVG,
+max. 500 KB) konfigurieren.
+
+**Workflow:**
+1. Werte anpassen
+2. „Vorschau anwenden" – nur der Admin sieht die Änderung
+3. „Für alle aktivieren" – Änderung wird für alle Nutzer sichtbar
+4. „Zurücksetzen" setzt alle Werte auf den Ausgangszustand
 
 ### Prozesse
 
-Übersicht aller Prozesse. Neuen Prozess anlegen:
-- Name und optionale Beschreibung
-- Sichtbarkeit: öffentlich oder privat
-- Basis: aktuelle Vorlage, leer starten oder ein Snapshot
-
-Der Anleger wird automatisch als Verantwortlicher eingetragen.
+Übersicht aller Prozesse. Neuen Prozess anlegen mit Name, Sichtbarkeit
+und Basis (aktuelle Vorlage, Snapshot oder leer starten).
 
 ### Vorlagen-Snapshots
 
-**Jetzt einfrieren:** Speichert alle aktiven Phasen und Schritte als
-benannten Snapshot. Dient als Basis für neue Prozesse.
-
-6 vorgefertigte Snapshots können mit `seed_vorlagen_snapshots.sql`
-eingespielt werden (siehe INSTALL.md).
+Aktuellen Stand einfrieren → als Basis für neue Prozesse nutzen.
+6 vorgefertigte Snapshots per `seed_vorlagen_snapshots.sql` verfügbar.
 
 ### Zugriff
 
-Personen freigeben damit sie sich anmelden können. Danach in
-„Prozess verwalten" als Teilnehmer zuweisen.
+Personen freigeben (Kürzel + Rolle), dann in „Prozess verwalten"
+als Teilnehmer zuweisen.
 
 ### Vorlage verwalten
 
-Phasen und Schritte der Standard-WebUntis-Vorlage pflegen.
+Standard-Vorlagentabelle (Phasen und Schritte) pflegen.
 
 ### Aktivitätsprotokoll
 
-Letzte 200 Aktionen des aktuellen Prozesses, als CSV exportierbar.
+Letzte 200 Aktionen des aktiven Prozesses, als CSV exportierbar.
 
 ---
 
-## Lokales Notfall-Passwort
+## Datenschutzhinweis
 
-Ein lokaler Benutzer der unabhängig von WebUntis funktioniert kann per SSH
-eingerichtet werden. Genaue Befehle siehe `docs/INSTALL.md`.
-
----
-
-## Was die App (noch) nicht kann
-
-- Keine E-Mail-Erinnerungen
-- Kein Zeitstrahl für abgeschlossene Prozesse
+Die App speichert ausschließlich die zur Prozesskoordination nötigen Daten:
+WebUntis-Kürzel und Anzeigenamen, Termine, Häkchen-Status und Kommentare.
+Es findet kein Tracking statt. Daten verlassen den Schulserver nicht.

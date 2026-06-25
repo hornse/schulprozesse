@@ -8,8 +8,41 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 ## [Unreleased]
 
 Geplant:
-- Zeitstrahl-Ansicht für vergangene Prozesse
+- Fortschrittsanzeige im Prozess-Tab (z. B. „Abitur (4/17)")
+- Schritte duplizieren
+- Archiv-Ansicht für abgeschlossene Prozesse
 - E-Mail-Erinnerungen bei überfälligen Schritten
+
+---
+
+## [1.3.0] – 2026-06-25
+
+### Hinzugefügt
+- **Hilfe-Seite** – ohne Login zugänglich über den „?"-Tab in der Navigation;
+  zwei Tabs: „Erste Schritte" (6 Karten mit geführter Einführung) und
+  „FAQ" (10 aufklappbare Fragen und Antworten); Schulname aus den
+  Einstellungen wird dynamisch eingesetzt
+- **Hilfe-Tab** immer in der Navigationsleiste sichtbar, auch ohne Anmeldung
+
+---
+
+## [1.2.0] – 2026-06-25
+
+### Hinzugefügt
+- **Erscheinungsbild-Einstellungen** im Admin-Bereich: Schulname, App-Titel,
+  Primär- und Sekundärfarbe, Logo-Upload (PNG/JPG/SVG, max. 500 KB)
+- **Vorschau-Workflow**: Änderungen erst nach explizitem „Für alle aktivieren"
+  live – Admin sieht Vorschau, alle anderen erst nach Aktivierung
+- **Logo-Endpunkt** `/api/einstellungen/logo` liefert das Logo sicher über
+  PHP aus (außerhalb Webroot, zufälliger Dateiname, keine direkte URL)
+- **Neue Migration** `003_einstellungen.sql` mit Standardwerten
+- **Sicherheit**: Farben gegen `#RRGGBB`-Muster validiert (CSS-Injection-Schutz),
+  SVGs auf gefährliche Inhalte geprüft (Script, Event-Handler, iFrame etc.),
+  MIME-Type serverseitig via `finfo` geprüft
+
+### Geändert
+- Header zeigt jetzt dynamisch Schulname und App-Titel aus den Einstellungen
+- Logo erscheint links neben dem Schulnamen im Header
 
 ---
 

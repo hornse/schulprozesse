@@ -447,6 +447,8 @@ function render() {
     $app.appendChild(renderProzessVerwaltungSeite());
   } else if (STATE.ansicht === 'admin' && STATE.user?.rolle === 'admin') {
     $app.appendChild(renderAdminSeite());
+  } else if (STATE.ansicht === 'hilfe') {
+    $app.appendChild(renderHilfeSeite());
   } else {
     $app.appendChild(renderDashboard());
   }
@@ -522,6 +524,16 @@ function renderShell() {
       $shellNav.appendChild(btn);
     }
   }
+
+  // Hilfe – immer sichtbar, ganz rechts
+  const sepHilfe = document.createElement('div');
+  sepHilfe.className = 'nav-sep';
+  $shellNav.appendChild(sepHilfe);
+  const btnHilfe = document.createElement('button');
+  btnHilfe.className = 'nav-tab' + (STATE.ansicht === 'hilfe' ? ' aktiv' : '');
+  btnHilfe.innerHTML = `<span class="nav-icon">?</span>Hilfe`;
+  btnHilfe.addEventListener('click', () => { STATE.ansicht = 'hilfe'; render(); });
+  $shellNav.appendChild(btnHilfe);
 }
 
 function renderProzessLeiste() {
@@ -1870,6 +1882,218 @@ function renderAktivitaetsprotokoll() {
     tabelle.appendChild(tbody); liste.innerHTML = ''; liste.appendChild(tabelle);
   });
   return block;
+}
+
+// ============================================================================
+// Hilfe-Seite (öffentlich, ohne Login zugänglich)
+// ============================================================================
+function renderHilfeSeite() {
+  const schulname = STATE.einstellungen?.schulname ?? 'Ihrer Schule';
+  const appTitel  = STATE.einstellungen?.app_titel  ?? 'Schulprozesse';
+
+  const container = document.createElement('div');
+  container.innerHTML = `
+    <div class="page-header">
+      <h2 class="page-title">Hilfe &amp; FAQ</h2>
+    </div>`;
+
+  // Tabs
+  let aktiverTab = 'erste-schritte';
+  const tabLeiste = document.createElement('div');
+  tabLeiste.className = 'zeitstrahl-tabs';
+  tabLeiste.innerHTML = `
+    <button class="zt-tab aktiv" data-hilfe="erste-schritte">Erste Schritte</button>
+    <button class="zt-tab" data-hilfe="faq">Häufige Fragen (FAQ)</button>`;
+
+  const inhalt = document.createElement('div');
+  inhalt.className = 'hilfe-inhalt';
+
+  function zeigeTab(id) {
+    aktiverTab = id;
+    tabLeiste.querySelectorAll('.zt-tab').forEach((b) =>
+      b.classList.toggle('aktiv', b.dataset.hilfe === id));
+    inhalt.innerHTML = '';
+    inhalt.appendChild(id === 'erste-schritte' ? renderErsteSchritte(schulname, appTitel) : renderFaq(schulname));
+  }
+
+  tabLeiste.querySelectorAll('[data-hilfe]').forEach((btn) =>
+    btn.addEventListener('click', () => zeigeTab(btn.dataset.hilfe)));
+
+  container.appendChild(tabLeiste);
+  zeigeTab('erste-schritte');
+  container.appendChild(inhalt);
+  return container;
+}
+
+function renderErsteSchritte(schulname, appTitel) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'hilfe-schritte';
+
+  const schritte = [
+    {
+      nr: '1',
+      titel: `Was ist ${appTitel}?`,
+      text: `${appTitel} ist eine digitale Checklisten-App für wiederkehrende Prozesse an ${schulname}. 
+             Typische Anwendungsbeispiele sind der WebUntis-Schuljahreswechsel, die Abitur-Organisation 
+             oder die Geräteausgabe. Jeder Prozess hat eine strukturierte Checkliste mit Phasen, 
+             Verantwortlichen und Terminen.`,
+      icon: '📋',
+    },
+    {
+      nr: '2',
+      titel: 'Wie melde ich mich an?',
+      text: `Klicke oben rechts auf „Anmelden" und gib deine gewohnten WebUntis-Zugangsdaten ein 
+             (Benutzername und Passwort wie beim normalen WebUntis-Login). 
+             <strong>Wichtig:</strong> Ein korrektes Passwort allein reicht nicht – 
+             du musst zusätzlich von einem Admin dieser App freigegeben worden sein. 
+             Wende dich an die für die App zuständige Person an deiner Schule.`,
+      icon: '🔑',
+    },
+    {
+      nr: '3',
+      titel: 'Wie navigiere ich zwischen Prozessen?',
+      text: `Nach der Anmeldung siehst du direkt unter der Navigationsleiste eine Reihe von 
+             Tab-Schaltflächen – eine pro Prozess dem du zugewiesen bist. 
+             Klicke auf einen Tab um zwischen den Prozessen zu wechseln. 
+             Dashboard, Checkliste und Zeitstrahl zeigen immer den aktuell gewählten Prozess.`,
+      icon: '🗂',
+    },
+    {
+      nr: '4',
+      titel: 'Wie erledige ich einen Schritt?',
+      text: `Klicke in der Checkliste auf einen Schritt um ihn aufzuklappen. 
+             Dort kannst du das Häkchen setzen um ihn als erledigt zu markieren, 
+             Verantwortliche eintragen, Start- und Zieldatum setzen und einen kurzen 
+             Kommentar hinterlassen. Alle Änderungen werden automatisch gespeichert 
+             wenn du das Feld verlässt.`,
+      icon: '✅',
+    },
+    {
+      nr: '5',
+      titel: 'Was bedeuten die verschiedenen Ansichten?',
+      text: `<strong>Dashboard:</strong> Kompakte Übersicht – was ist gerade dran, was ist überfällig, 
+             wie weit ist jede Phase? Auch ohne Anmeldung sichtbar (bei öffentlichen Prozessen).<br><br>
+             <strong>Checkliste:</strong> Die vollständige Liste aller Schritte mit allen Details. 
+             Nur nach Anmeldung.<br><br>
+             <strong>Zeitstrahl:</strong> Gantt-Diagramm und Timeline der terminierten Schritte. 
+             Zoom-Regler für Tages- bis Wochenansicht.`,
+      icon: '👁',
+    },
+    {
+      nr: '6',
+      titel: 'An wen wende ich mich bei Problemen?',
+      text: `Bei technischen Problemen oder wenn du keinen Zugriff bekommst, wende dich an den 
+             IT-Verantwortlichen oder die für diese App zuständige Person an ${schulname}. 
+             Diese Person hat Admin-Rechte und kann dich freischalten oder dir helfen.`,
+      icon: '🤝',
+    },
+  ];
+
+  schritte.forEach((s) => {
+    const card = document.createElement('div');
+    card.className = 'hilfe-karte';
+    card.innerHTML = `
+      <div class="hilfe-karte-nr">${s.icon}</div>
+      <div class="hilfe-karte-inhalt">
+        <h4 class="hilfe-karte-titel">${s.nr}. ${s.titel}</h4>
+        <p class="hilfe-karte-text">${s.text}</p>
+      </div>`;
+    wrapper.appendChild(card);
+  });
+
+  return wrapper;
+}
+
+function renderFaq(schulname) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'hilfe-faq';
+
+  const fragen = [
+    {
+      frage: 'Ich kann mich nicht anmelden, obwohl mein Passwort korrekt ist.',
+      antwort: `Ein korrektes WebUntis-Passwort allein reicht nicht aus. Zusätzlich muss ein Admin 
+                dieser App dich in der Zugriffsliste freigegeben haben. Wende dich an die zuständige 
+                Person an ${schulname} und bitte um Freischaltung mit deinem WebUntis-Kürzel.`,
+    },
+    {
+      frage: 'Ich sehe nach dem Anmelden keine Checkliste.',
+      antwort: `Du musst nicht nur zur App zugelassen sein, sondern auch einem oder mehreren 
+                Prozessen als Teilnehmer zugewiesen werden. Das macht ein Admin oder der Verantwortliche 
+                des Prozesses. Sprich die zuständige Person an.`,
+    },
+    {
+      frage: 'Ich habe versehentlich ein Häkchen gesetzt. Kann ich das rückgängig machen?',
+      antwort: `Ja. Klappe den Schritt auf und klicke erneut auf das Häkchen – es lässt sich 
+                wieder entfernen. Die Aktion wird im Aktivitätsprotokoll aufgezeichnet, 
+                aber das ist kein Problem.`,
+    },
+    {
+      frage: 'Wer kann meine Kommentare und Verantwortlichen-Einträge sehen?',
+      antwort: `Kommentare und Verantwortlichen-Einträge sind nur für angemeldete Personen sichtbar 
+                die dem Prozess zugewiesen sind. Das öffentliche Dashboard zeigt diese Informationen 
+                bewusst nicht an.`,
+    },
+    {
+      frage: 'Kann ich die App auf dem Smartphone nutzen?',
+      antwort: `Ja. Die App ist für mobile Geräte optimiert. Öffne einfach die URL in deinem 
+                Smartphone-Browser. Eine separate App zum Installieren gibt es nicht.`,
+    },
+    {
+      frage: 'Was ist der Unterschied zwischen "Verantwortlich" und "Mitarbeitend"?',
+      antwort: `Verantwortliche können den Prozess vollständig verwalten: Teilnehmer hinzufügen, 
+                Schritte und Phasen bearbeiten, den Prozess öffentlich oder privat schalten. 
+                Mitarbeitende können Häkchen setzen, Kommentare schreiben und Daten wie Termine 
+                eintragen – aber keine strukturellen Änderungen vornehmen.`,
+    },
+    {
+      frage: 'Was passiert mit meinen Daten?',
+      antwort: `Die App speichert nur das was zur Koordination der Schulprozesse nötig ist: 
+                Namen, Kürzel (aus WebUntis), Termine, Häkchen und Kommentare. Es findet kein 
+                Tracking statt. Die Daten liegen auf dem Server der Schule und werden nicht 
+                an Dritte weitergegeben.`,
+    },
+    {
+      frage: 'Ich sehe einen Prozess im Dashboard, kann aber nicht auf die Checkliste zugreifen.',
+      antwort: `Das öffentliche Dashboard zeigt alle Prozesse die als „öffentlich" markiert sind – 
+                auch wenn du ihnen nicht zugewiesen bist. Die Checkliste ist nur für zugewiesene 
+                Teilnehmer sichtbar. Lass dich vom Verantwortlichen des Prozesses als Teilnehmer 
+                eintragen.`,
+    },
+    {
+      frage: 'Wie drucke ich eine Checkliste aus?',
+      antwort: `In der Checklisten-Ansicht gibt es oben rechts einen „PDF"-Button. 
+                Dieser öffnet den Druck-Dialog deines Browsers. Wähle dort „Als PDF speichern" 
+                um eine PDF-Datei zu erstellen, oder drucke direkt.`,
+    },
+    {
+      frage: 'Kann ich die Checkliste als Excel-Datei exportieren?',
+      antwort: `Ja. Neben dem PDF-Button gibt es einen „CSV"-Button. Die heruntergeladene Datei 
+                lässt sich in Excel, LibreOffice und Google Sheets öffnen. Sie enthält alle Schritte 
+                mit Terminen, Verantwortlichen und Kommentaren.`,
+    },
+  ];
+
+  fragen.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'faq-item';
+    item.innerHTML = `
+      <button class="faq-frage" data-idx="${i}">
+        <span>${f.frage}</span>
+        <span class="faq-chev">▸</span>
+      </button>
+      <div class="faq-antwort" id="faq-${i}">${f.antwort}</div>`;
+
+    item.querySelector('.faq-frage').addEventListener('click', () => {
+      const antwortEl = item.querySelector('.faq-antwort');
+      const chevEl    = item.querySelector('.faq-chev');
+      const offen     = antwortEl.classList.toggle('offen');
+      chevEl.style.transform = offen ? 'rotate(90deg)' : '';
+    });
+
+    wrapper.appendChild(item);
+  });
+
+  return wrapper;
 }
 
 // ============================================================================

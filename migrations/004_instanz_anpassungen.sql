@@ -46,3 +46,19 @@ CREATE INDEX IF NOT EXISTS idx_instanz_schritte_prozess
 ALTER TABLE instanz_schritte ADD COLUMN verantwortlich_anzeigename TEXT;
 ALTER TABLE instanz_schritte ADD COLUMN start_datum TEXT;
 ALTER TABLE instanz_schritte ADD COLUMN geplantes_datum TEXT;
+
+-- Prozessspezifische Phasen-Anpassungen
+-- Überschreibt Name und/oder Farbe einer Vorlage-Phase für einen bestimmten Prozess.
+-- Die globale phasen-Tabelle bleibt unberührt.
+CREATE TABLE IF NOT EXISTS instanz_phasen (
+    prozess_id    INTEGER NOT NULL REFERENCES prozesse(id) ON DELETE CASCADE,
+    phase_id      INTEGER NOT NULL REFERENCES phasen(id)   ON DELETE CASCADE,
+    instanz_name  TEXT,
+    instanz_farbe TEXT,
+    geaendert_am  TEXT NOT NULL DEFAULT (datetime('now')),
+    geaendert_von TEXT,
+    PRIMARY KEY (prozess_id, phase_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_instanz_phasen_prozess
+  ON instanz_phasen(prozess_id);

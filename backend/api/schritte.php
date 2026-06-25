@@ -40,13 +40,16 @@ function handleListSchritte(PDO $db, array $config, array $input): void
 
     $nurAktive = empty($input['alle']); // alle=1 liefert auch deaktivierte (für Verwaltung)
 
-    // Vorlage-basierte Schritte
+    // Vorlage-basierte Schritte – mit prozessspezifischen Phasen-Überschreibungen
     $stmt = $db->prepare(
         'SELECT si.id, si.erledigt, si.verantwortlich_user, si.verantwortlich_anzeigename,
                 si.start_datum, si.geplantes_datum, si.erledigt_am, si.erledigt_von,
                 si.kommentar, si.kann_parallel, si.deaktiviert,
                 si.instanz_titel, si.instanz_reihenfolge,
-                p.name AS phase, p.farbe AS phase_farbe, p.reihenfolge AS phase_reihenfolge,
+                COALESCE(ip.instanz_name,  p.name)  AS phase,
+                COALESCE(ip.instanz_farbe, p.farbe) AS phase_farbe,
+                p.reihenfolge AS phase_reihenfolge,
+                p.id AS phase_id,
                 sv.reihenfolge AS vorlage_reihenfolge, sv.titel AS vorlage_titel,
                 sv.beschreibung,
                 COALESCE(si.instanz_titel, sv.titel)             AS titel,
@@ -55,6 +58,8 @@ function handleListSchritte(PDO $db, array $config, array $input): void
          FROM schritt_instanzen si
          JOIN schritt_vorlagen sv ON sv.id = si.vorlage_id
          JOIN phasen p ON p.id = sv.phase_id
+         LEFT JOIN instanz_phasen ip
+               ON ip.prozess_id = si.prozess_id AND ip.phase_id = p.id
          WHERE si.prozess_id = :pid' .
         ($nurAktive ? ' AND si.deaktiviert = 0' : '')
     );
@@ -308,5 +313,86 @@ function handleDeleteInstanzSchritt(PDO $db, array $config, array $input, array 
 
     Guard::requireProzessVerantwortlich($db, (int) $info['prozess_id']);
     $db->prepare('DELETE FROM instanz_schritte WHERE id = :id')->execute([':id' => $id]);
+    Response::json(['ok' => true]);
+}
+
+// ============================================================================
+// Prozessspezifische Phasen-Anpassungen (instanz_phasen)
+// Verantwortliche können Name und Farbe einer Vorlage-Phase für ihren
+// Prozess überschreiben ohne die globale phasen-Tabelle zu berühren.
+// ============================================================================
+
+function handleUpsertInstanzPhase(PDO $db, array $config, array $input, array $params): void
+{
+    $user      = Guard::requireLogin($db);
+    $prozessId = (int) $params['prozess_id'];
+    $phaseId   = (int) $params['phase_id'];
+
+    Guard::requireProzessVerantwortlich($db, $prozessId);
+
+    $sets = []; $werte = [
+        ':prozess' => $prozessId,
+        ':phase'   => $phaseId,
+        ':von'     => $user['webuntis_user'],
+    ];
+
+    if (array_key_exists('instanz_name', $input)) {
+        $werte[':name']  = $input['instanz_name'] ?: null;
+    } else {
+        $werte[':name'] = null;
+    }
+    if (array_key_exists('instanz_farbe', $input)) {
+        $farbe = $input['instanz_farbe'];
+        if ($farbe && !preg_match('/^#[0-9A-Fa-f]{6}$/', $farbe)) {
+            Response::error('Ungültiger Farbwert. Erwartet: #RRGGBB', 400);
+        }
+        $werte[':farbe'] = $farbe ?: null;
+    } else {
+        $werte[':farbe'] = null;
+    }
+
+    // Bestehende Werte laden um nur geänderte Felder zu überschreiben
+    $bestehend = $db->prepare(
+        'SELECT instanz_name, instanz_farbe FROM instanz_phasen
+         WHERE prozess_id = :p AND phase_id = :ph'
+    );
+    $bestehend->execute([':p' => $prozessId, ':ph' => $phaseId]);
+    $alt = $bestehend->fetch();
+
+    $neuName  = array_key_exists('instanz_name',  $input) ? $werte[':name']  : ($alt['instanz_name']  ?? null);
+    $neuFarbe = array_key_exists('instanz_farbe', $input) ? $werte[':farbe'] : ($alt['instanz_farbe'] ?? null);
+
+    $db->prepare(
+        'INSERT INTO instanz_phasen
+             (prozess_id, phase_id, instanz_name, instanz_farbe, geaendert_am, geaendert_von)
+         VALUES (:p, :ph, :name, :farbe, datetime(\'now\'), :von)
+         ON CONFLICT(prozess_id, phase_id)
+         DO UPDATE SET instanz_name  = :name,
+                       instanz_farbe = :farbe,
+                       geaendert_am  = datetime(\'now\'),
+                       geaendert_von = :von'
+    )->execute([
+        ':p'    => $prozessId,
+        ':ph'   => $phaseId,
+        ':name' => $neuName,
+        ':farbe' => $neuFarbe,
+        ':von'  => $user['webuntis_user'],
+    ]);
+
+    Response::json(['ok' => true]);
+}
+
+function handleDeleteInstanzPhase(PDO $db, array $config, array $input, array $params): void
+{
+    $user      = Guard::requireLogin($db);
+    $prozessId = (int) $params['prozess_id'];
+    $phaseId   = (int) $params['phase_id'];
+
+    Guard::requireProzessVerantwortlich($db, $prozessId);
+
+    $db->prepare(
+        'DELETE FROM instanz_phasen WHERE prozess_id = :p AND phase_id = :ph'
+    )->execute([':p' => $prozessId, ':ph' => $phaseId]);
+
     Response::json(['ok' => true]);
 }

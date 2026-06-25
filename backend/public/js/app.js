@@ -1420,15 +1420,101 @@ function renderInstanzSchrittVerwaltung() {
     if (alle.length === 0) {
       liste.innerHTML = '<p style="font-size:12px;color:var(--muted);">Keine Vorlage-Schritte vorhanden.</p>';
     } else {
+      // Phasen-Blöcke mit editierbarem Kopf (Name + Farbe)
+      // phase_id kommt aus dem JOIN auf phasen in handleListSchritte
       let aktuellePhase = null;
+      let aktuellerPhaseBlock = null;
+      let aktuelleSchrittListe = null;
+
+      function neuerPhaseBlock(s) {
+        const phaseBlock = document.createElement('div');
+        phaseBlock.className = 'phasen-block';
+        phaseBlock.style.setProperty('--phase-farbe', s.phase_farbe);
+        phaseBlock.style.marginBottom = '6px';
+
+        const kopf = document.createElement('div');
+        kopf.className = 'phasen-kopf';
+
+        // Farb-Button mit Popup
+        let aktFarbe = s.phase_farbe;
+        const farbBtn = document.createElement('button');
+        farbBtn.type = 'button';
+        farbBtn.style.cssText = `background:${aktFarbe};width:22px;height:22px;border-radius:4px;border:2px solid rgba(0,0,0,.15);cursor:pointer;flex-shrink:0;`;
+        const farbPopup = document.createElement('div');
+        farbPopup.className = 'farb-popup';
+        farbPopup.style.display = 'none';
+        farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
+          aktFarbe = f;
+          farbBtn.style.background = f;
+          phaseBlock.style.setProperty('--phase-farbe', f);
+          await api(
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${s.phase_id}`,
+            { method: 'POST', body: { instanz_farbe: f } }
+          );
+          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+          STATE.schritte = res.schritte;
+        }));
+        farbBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          farbPopup.style.display = farbPopup.style.display === 'none' ? 'block' : 'none';
+        });
+        const farbWrap = document.createElement('div');
+        farbWrap.style.position = 'relative';
+        farbWrap.appendChild(farbBtn);
+        farbWrap.appendChild(farbPopup);
+
+        // Name-Feld
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'phasen-name-feld';
+        nameInput.value = s.phase.replace(/^\d+\.\s*/, '');
+        nameInput.placeholder = 'Phasenname';
+        nameInput.addEventListener('change', async () => {
+          const neuerName = nameInput.value.trim();
+          if (!neuerName) return;
+          await api(
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${s.phase_id}`,
+            { method: 'POST', body: { instanz_name: neuerName } }
+          );
+          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+          STATE.schritte = res.schritte;
+        });
+
+        // Zurücksetzen-Button
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'btn-sekundaer btn';
+        resetBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;margin-left:auto;flex-shrink:0;';
+        resetBtn.textContent = '↺ zurücksetzen';
+        resetBtn.title = 'Auf Vorlage zurücksetzen';
+        resetBtn.addEventListener('click', async () => {
+          await api(
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${s.phase_id}`,
+            { method: 'DELETE' }
+          );
+          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+          STATE.schritte = res.schritte;
+          block.replaceWith(renderInstanzSchrittVerwaltung());
+        });
+
+        kopf.appendChild(farbWrap);
+        kopf.appendChild(nameInput);
+        kopf.appendChild(resetBtn);
+        phaseBlock.appendChild(kopf);
+
+        const schrittListe = document.createElement('div');
+        schrittListe.className = 'vorlagen-liste';
+        phaseBlock.appendChild(schrittListe);
+        liste.appendChild(phaseBlock);
+        return { phaseBlock, schrittListe };
+      }
+
       alle.forEach((s) => {
         if (s.phase !== aktuellePhase) {
           aktuellePhase = s.phase;
-          const pt = document.createElement('div');
-          pt.className = 'instanz-phase-titel';
-          pt.style.color = s.phase_farbe;
-          pt.textContent = s.phase;
-          liste.appendChild(pt);
+          const { phaseBlock, schrittListe } = neuerPhaseBlock(s);
+          aktuellerPhaseBlock = phaseBlock;
+          aktuelleSchrittListe = schrittListe;
         }
         const zeile = document.createElement('div');
         zeile.className = 'instanz-schritt-zeile' + (s.deaktiviert ? ' deaktiviert' : '');
@@ -1460,7 +1546,7 @@ function renderInstanzSchrittVerwaltung() {
           STATE.schritte = res.schritte;
           block.replaceWith(renderInstanzSchrittVerwaltung());
         });
-        liste.appendChild(zeile);
+        aktuelleSchrittListe.appendChild(zeile);
       });
     }
   });
@@ -1492,51 +1578,81 @@ function renderInstanzSchrittVerwaltung() {
     });
 
     phasenMap.forEach((schritte, phaseName) => {
-      const phaseFarbe = schritte[0].phase_farbe;
-      const phaseHeader = document.createElement('div');
-      phaseHeader.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 4px;';
+      let aktFarbe = schritte[0].phase_farbe;
 
-      // Farb-Vorschau + Edit
-      const farbVorschau = document.createElement('div');
-      farbVorschau.style.cssText = `width:14px;height:14px;border-radius:3px;background:${phaseFarbe};flex-shrink:0;`;
+      // Phase-Block mit Kopf (Name + Farbe editierbar) und Schritt-Liste
+      const phaseBlock = document.createElement('div');
+      phaseBlock.className = 'phasen-block';
+      phaseBlock.style.setProperty('--phase-farbe', aktFarbe);
+      phaseBlock.style.marginBottom = '10px';
 
-      const phaseTitelInput = document.createElement('input');
-      phaseTitelInput.type = 'text';
-      phaseTitelInput.value = phaseName;
-      phaseTitelInput.style.cssText = 'font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:none;background:none;color:var(--ink);padding:2px 4px;border-radius:4px;flex:1;';
-      phaseTitelInput.addEventListener('focus', () => {
-        phaseTitelInput.style.background = 'var(--paper)';
-        phaseTitelInput.style.border = '1px solid var(--line)';
-      });
-      phaseTitelInput.addEventListener('blur', async () => {
-        phaseTitelInput.style.background = 'none';
-        phaseTitelInput.style.border = 'none';
-        const neuerName = phaseTitelInput.value.trim();
-        if (neuerName && neuerName !== phaseName) {
-          // Alle Schritte dieser Phase umbenennen
-          for (const s of schritte) {
-            await api(`/api/instanz-schritte/${s.id}`, {
-              method: 'PATCH', body: { phase_name: neuerName }
-            });
-          }
-          block.replaceWith(renderInstanzSchrittVerwaltung());
+      // Kopf
+      const kopf = document.createElement('div');
+      kopf.className = 'phasen-kopf';
+
+      // Farb-Button mit Popup
+      const farbBtn = document.createElement('button');
+      farbBtn.type = 'button';
+      farbBtn.style.cssText = `background:${aktFarbe};width:22px;height:22px;border-radius:4px;border:2px solid rgba(0,0,0,.15);cursor:pointer;flex-shrink:0;`;
+      const farbPopup = document.createElement('div');
+      farbPopup.className = 'farb-popup';
+      farbPopup.style.display = 'none';
+      farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
+        aktFarbe = f;
+        farbBtn.style.background = f;
+        phaseBlock.style.setProperty('--phase-farbe', f);
+        // Farbe aller Schritte dieser Phase aktualisieren
+        for (const s of schritte) {
+          await api(`/api/instanz-schritte/${s.id}`, {
+            method: 'PATCH', body: { phase_farbe: f }
+          });
         }
+      }));
+      farbBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        farbPopup.style.display = farbPopup.style.display === 'none' ? 'block' : 'none';
+      });
+      document.addEventListener('click', () => { farbPopup.style.display = 'none'; });
+      const farbWrap = document.createElement('div');
+      farbWrap.style.position = 'relative';
+      farbWrap.appendChild(farbBtn);
+      farbWrap.appendChild(farbPopup);
+
+      // Name-Feld
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'phasen-name-feld';
+      nameInput.value = phaseName;
+      nameInput.style.color = aktFarbe;
+      nameInput.addEventListener('change', async () => {
+        const neuerName = nameInput.value.trim();
+        if (!neuerName || neuerName === phaseName) return;
+        for (const s of schritte) {
+          await api(`/api/instanz-schritte/${s.id}`, {
+            method: 'PATCH', body: { phase_name: neuerName }
+          });
+        }
+        block.replaceWith(renderInstanzSchrittVerwaltung());
       });
 
-      phaseHeader.appendChild(farbVorschau);
-      phaseHeader.appendChild(phaseTitelInput);
-      block.insertBefore(phaseHeader, neuePhaseBlock);
+      kopf.appendChild(farbWrap);
+      kopf.appendChild(nameInput);
+      phaseBlock.appendChild(kopf);
 
+      // Schritte der Phase
+      const schrittListe = document.createElement('div');
+      schrittListe.className = 'vorlagen-liste';
       schritte.forEach((s) => {
         const zeile = document.createElement('div');
-        zeile.className = 'instanz-schritt-zeile';
+        zeile.className = 'vorlagen-zeile-wrapper';
         zeile.innerHTML = `
-          <input type="text" class="instanz-titel-feld"
-                 value="${s.titel.replace(/"/g, '&quot;')}">
-          <span class="instanz-orig">eigener Schritt</span>
-          <button class="btn-sekundaer btn btn-gefahr"
-                  style="width:auto;font-size:11px;padding:3px 8px;">✕ löschen</button>`;
-        zeile.querySelector('.instanz-titel-feld').addEventListener('change', async (e) => {
+          <div class="vorlagen-zeile">
+            <input type="text" class="vorlagen-titel-feld"
+                   value="${s.titel.replace(/"/g, '&quot;')}">
+            <button class="btn-sekundaer btn btn-gefahr"
+                    style="width:auto;font-size:11px;padding:3px 8px;">✕ löschen</button>
+          </div>`;
+        zeile.querySelector('.vorlagen-titel-feld').addEventListener('change', async (e) => {
           await api(`/api/instanz-schritte/${s.id}`, {
             method: 'PATCH', body: { titel: e.target.value.trim() }
           });
@@ -1548,8 +1664,11 @@ function renderInstanzSchrittVerwaltung() {
           STATE.schritte = res.schritte;
           block.replaceWith(renderInstanzSchrittVerwaltung());
         });
-        block.insertBefore(zeile, neuePhaseBlock);
+        schrittListe.appendChild(zeile);
       });
+      phaseBlock.appendChild(schrittListe);
+
+      block.insertBefore(phaseBlock, neuePhaseBlock);
     });
   });
 

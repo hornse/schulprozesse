@@ -19,6 +19,7 @@ const STATE = {
   vorlagenSets: [],         // Snapshots (admin)
   rollen: [],               // Zugriffsliste (admin)
   publicDashboard: [],      // [ { id, label, schritte } ] ohne Login
+  einstellungen: null,      // { schulname, app_titel, farbe_akzent, farbe_sekundaer, ... }
   ansicht: 'dashboard',     // 'dashboard' | 'checkliste' | 'zeitstrahl' | 'login'
   offeneSchritte: new Set(),
   offeneVorlagen: new Set(),
@@ -87,6 +88,51 @@ async function doLogout() {
 // ============================================================================
 async function ladePublicDashboard() {
   STATE.publicDashboard = await api('/api/dashboard');
+}
+
+/**
+ * Lädt Erscheinungsbild-Einstellungen und wendet sie als CSS-Variablen an.
+ * Öffentlich zugänglich – kein Login nötig damit auch unangemeldete Besucher
+ * das korrekte Erscheinungsbild sehen.
+ */
+async function ladeUndWendeEinstellungenAn() {
+  try {
+    // Einstellungen sind öffentlich lesbar (Schulname, Farben, Logo)
+    // aber wir rufen den Admin-Endpunkt nur auf wenn eingeloggt.
+    // Für unangemeldete Nutzer: CSS-Variablen bleiben auf Standardwerten.
+    if (!STATE.user) return;
+    STATE.einstellungen = await api('/api/einstellungen');
+    wendeEinstellungenAn(STATE.einstellungen);
+  } catch {
+    // Fehler still ignorieren – Standard-CSS bleibt erhalten
+  }
+}
+
+/**
+ * Setzt CSS-Variablen basierend auf den Einstellungen.
+ * Wird nach dem Laden und nach dem Speichern neuer Einstellungen aufgerufen.
+ */
+function wendeEinstellungenAn(e) {
+  if (!e) return;
+  const root = document.documentElement;
+
+  // Farben nur setzen wenn Vorschau aktiv oder keine Vorschau nötig
+  if (e.farbe_akzent)    root.style.setProperty('--accent',    e.farbe_akzent);
+  if (e.farbe_sekundaer) root.style.setProperty('--sekundaer', e.farbe_sekundaer);
+
+  // Seitentitel aktualisieren
+  if (e.app_titel) document.title = e.app_titel;
+
+  // Logo-Src im Header aktualisieren wenn vorhanden
+  const logoEl = document.getElementById('shell-logo');
+  if (logoEl) {
+    if (e.hat_logo) {
+      logoEl.src = '/api/einstellungen/logo?' + Date.now(); // Cache-Busting
+      logoEl.style.display = 'block';
+    } else {
+      logoEl.style.display = 'none';
+    }
+  }
 }
 
 async function ladeAlles() {
@@ -408,6 +454,9 @@ function render() {
 
 function renderShell() {
   // Benutzer-Bereich oben rechts
+  const schulname = STATE.einstellungen?.schulname ?? 'Friedrich-Rückert-Gymnasium';
+  const appTitel  = STATE.einstellungen?.app_titel  ?? 'Schulprozesse';
+
   if (STATE.user) {
     $shellUser.innerHTML = '';
     const wrap = document.createElement('div');
@@ -522,6 +571,7 @@ function renderAdminSeite() {
   container.innerHTML = `<div class="page-header">
     <h2 class="page-title">Administration</h2>
   </div>`;
+  container.appendChild(renderEinstellungenBlock());
   container.appendChild(renderProzesseBlock());
   container.appendChild(renderZugriffBlock());
   container.appendChild(renderVorlagenVerwaltung());
@@ -1315,6 +1365,198 @@ function renderAdminBereich() {
   return container;
 }
 
+// ============================================================================
+// Erscheinungsbild-Einstellungen
+// ============================================================================
+
+function renderEinstellungenBlock() {
+  const e = STATE.einstellungen ?? {};
+  const block = document.createElement('div');
+  block.className = 'admin-section';
+  block.innerHTML = `
+    <h3>Erscheinungsbild</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">
+      Änderungen werden erst nach „Aktivieren" für alle sichtbar. Bis dahin
+      siehst nur du die Vorschau.
+    </p>
+
+    <div class="einst-grid">
+      <div class="einst-gruppe">
+        <label class="einst-label">Schulname</label>
+        <input type="text" id="einst-schulname" maxlength="80"
+               value="${(e.schulname ?? 'Meine Schule').replace(/"/g, '&quot;')}"
+               placeholder="z. B. Friedrich-Rückert-Gymnasium Düsseldorf">
+      </div>
+      <div class="einst-gruppe">
+        <label class="einst-label">App-Titel</label>
+        <input type="text" id="einst-app-titel" maxlength="40"
+               value="${(e.app_titel ?? 'Schulprozesse').replace(/"/g, '&quot;')}"
+               placeholder="z. B. Schulprozesse">
+      </div>
+    </div>
+
+    <div class="einst-grid" style="margin-top:12px;">
+      <div class="einst-gruppe">
+        <label class="einst-label">Primärfarbe (Akzent)</label>
+        <div class="einst-farb-zeile">
+          <input type="text" id="einst-farbe-akzent" maxlength="7"
+                 value="${e.farbe_akzent ?? '#5B6FA8'}"
+                 placeholder="#5B6FA8" pattern="^#[0-9A-Fa-f]{6}$">
+          <div class="einst-farb-vorschau" id="prev-akzent"
+               style="background:${e.farbe_akzent ?? '#5B6FA8'};"></div>
+        </div>
+      </div>
+      <div class="einst-gruppe">
+        <label class="einst-label">Sekundärfarbe</label>
+        <div class="einst-farb-zeile">
+          <input type="text" id="einst-farbe-sekundaer" maxlength="7"
+                 value="${e.farbe_sekundaer ?? '#D98A2B'}"
+                 placeholder="#D98A2B" pattern="^#[0-9A-Fa-f]{6}$">
+          <div class="einst-farb-vorschau" id="prev-sekundaer"
+               style="background:${e.farbe_sekundaer ?? '#D98A2B'};"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="einst-gruppe" style="margin-top:12px;">
+      <label class="einst-label">Logo (PNG, JPG oder SVG, max. 500 KB)</label>
+      <div class="einst-logo-zeile">
+        ${e.hat_logo
+          ? `<img src="/api/einstellungen/logo?${Date.now()}" alt="Logo"
+                  class="einst-logo-vorschau" id="logo-vorschau">
+             <button class="btn-sekundaer btn btn-gefahr" id="logo-loeschen">Logo löschen</button>`
+          : '<span style="font-size:12px;color:var(--muted);">Kein Logo hochgeladen.</span>'
+        }
+      </div>
+      <input type="file" id="einst-logo-input" accept="image/png,image/jpeg,image/svg+xml"
+             style="margin-top:8px;">
+    </div>
+
+    <div class="einst-aktionen">
+      <button class="btn-sekundaer btn" id="einst-vorschau-btn">👁 Vorschau anwenden</button>
+      <button class="btn" id="einst-aktivieren-btn" style="width:auto;">
+        ${e.vorschau_aktiv === '1' ? '✓ Bereits aktiv' : '⚡ Für alle aktivieren'}
+      </button>
+      <button class="btn-sekundaer btn btn-gefahr" id="einst-reset-btn">Zurücksetzen</button>
+    </div>
+    <div id="einst-status" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>`;
+
+  // Live-Farbvorschau
+  block.querySelector('#einst-farbe-akzent').addEventListener('input', (e) => {
+    const v = e.target.value;
+    if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+      block.querySelector('#prev-akzent').style.background = v;
+    }
+  });
+  block.querySelector('#einst-farbe-sekundaer').addEventListener('input', (e) => {
+    const v = e.target.value;
+    if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+      block.querySelector('#prev-sekundaer').style.background = v;
+    }
+  });
+
+  const status = (msg, ok = true) => {
+    const el = block.querySelector('#einst-status');
+    el.textContent = msg;
+    el.style.color = ok ? 'var(--accent)' : 'var(--error)';
+  };
+
+  // Vorschau anwenden (nur lokal sichtbar)
+  block.querySelector('#einst-vorschau-btn').addEventListener('click', async () => {
+    const daten = sammelEinstellungen(block);
+    if (!daten) { status('Ungültige Farbwerte – bitte #RRGGBB-Format verwenden.', false); return; }
+    try {
+      // Logo ggf. hochladen
+      const logoInput = block.querySelector('#einst-logo-input');
+      if (logoInput.files.length > 0) await ladeLogoHoch(logoInput.files[0]);
+      // Einstellungen speichern
+      await api('/api/einstellungen', { method: 'POST', body: daten });
+      STATE.einstellungen = await api('/api/einstellungen');
+      wendeEinstellungenAn(STATE.einstellungen);
+      status('Vorschau aktiv – nur für dich sichtbar. Klicke „Für alle aktivieren" um es live zu schalten.');
+    } catch (err) { status(err.message, false); }
+  });
+
+  // Für alle aktivieren
+  block.querySelector('#einst-aktivieren-btn').addEventListener('click', async () => {
+    const daten = sammelEinstellungen(block);
+    if (!daten) { status('Ungültige Farbwerte.', false); return; }
+    try {
+      const logoInput = block.querySelector('#einst-logo-input');
+      if (logoInput.files.length > 0) await ladeLogoHoch(logoInput.files[0]);
+      await api('/api/einstellungen', { method: 'POST', body: daten });
+      await api('/api/einstellungen/aktivieren', { method: 'POST', body: { aktiv: true } });
+      STATE.einstellungen = await api('/api/einstellungen');
+      wendeEinstellungenAn(STATE.einstellungen);
+      updateBrandText();
+      status('✓ Einstellungen für alle Nutzer aktiviert.');
+      render();
+    } catch (err) { status(err.message, false); }
+  });
+
+  // Logo löschen
+  block.querySelector('#logo-loeschen')?.addEventListener('click', async () => {
+    if (!confirm('Logo wirklich löschen?')) return;
+    try {
+      await api('/api/einstellungen/logo', { method: 'DELETE' });
+      STATE.einstellungen = await api('/api/einstellungen');
+      render();
+    } catch (err) { status(err.message, false); }
+  });
+
+  // Zurücksetzen
+  block.querySelector('#einst-reset-btn').addEventListener('click', async () => {
+    if (!confirm('Alle Erscheinungsbild-Einstellungen auf Standard zurücksetzen?')) return;
+    try {
+      await api('/api/einstellungen/zuruecksetzen', { method: 'POST' });
+      STATE.einstellungen = await api('/api/einstellungen');
+      // CSS-Variablen zurücksetzen
+      document.documentElement.style.removeProperty('--accent');
+      document.documentElement.style.removeProperty('--sekundaer');
+      document.title = 'Schulprozesse';
+      updateBrandText();
+      render();
+    } catch (err) { status(err.message, false); }
+  });
+
+  return block;
+}
+
+function sammelEinstellungen(block) {
+  const akzent    = block.querySelector('#einst-farbe-akzent').value.trim();
+  const sekundaer = block.querySelector('#einst-farbe-sekundaer').value.trim();
+  if (!/^#[0-9A-Fa-f]{6}$/.test(akzent))    return null;
+  if (!/^#[0-9A-Fa-f]{6}$/.test(sekundaer)) return null;
+  return {
+    schulname:       block.querySelector('#einst-schulname').value.trim(),
+    app_titel:       block.querySelector('#einst-app-titel').value.trim(),
+    farbe_akzent:    akzent,
+    farbe_sekundaer: sekundaer,
+  };
+}
+
+async function ladeLogoHoch(datei) {
+  const formData = new FormData();
+  formData.append('logo', datei);
+  const res = await fetch('/api/einstellungen/logo', {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'SchuljahreswechselApp' },
+    credentials: 'same-origin',
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? 'Logo-Upload fehlgeschlagen.');
+  return data;
+}
+
+function updateBrandText() {
+  const el = document.getElementById('brand-text');
+  if (!el) return;
+  const schulname = STATE.einstellungen?.schulname ?? 'Friedrich-Rückert-Gymnasium';
+  const appTitel  = STATE.einstellungen?.app_titel  ?? 'Schulprozesse';
+  el.innerHTML = `${schulname} · <strong>${appTitel}</strong>`;
+}
+
 function renderProzesseBlock() {
   const block = document.createElement('div');
   block.innerHTML = `
@@ -1636,6 +1878,10 @@ function renderAktivitaetsprotokoll() {
 (async function start() {
   await ladePublicDashboard();
   await checkAuth();
-  if (STATE.user) await ladeAlles();
+  if (STATE.user) {
+    await ladeAlles();
+    await ladeUndWendeEinstellungenAn();
+    updateBrandText();
+  }
   render();
 })();

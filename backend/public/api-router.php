@@ -21,13 +21,19 @@ require __DIR__ . '/../api/vorlagen.php';
 require __DIR__ . '/../api/vorlagen-sets.php';
 require __DIR__ . '/../api/export.php';
 
+require __DIR__ . '/../api/einstellungen.php';
+
 $route  = trim((string) ($_GET['route'] ?? ''), '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Query-Parameter und JSON-Body zusammenführen damit z.B.
-// ?prozess_id=2 die Handler erreicht (Body hat Vorrang bei Konflikten).
+// Query-Parameter und JSON-Body zusammenführen.
+// Bei Multipart-Uploads (Logo) ist der Body kein JSON sondern $_POST/$_FILES.
 $rawBody   = file_get_contents('php://input');
 $bodyInput = $rawBody ? (json_decode($rawBody, true) ?? []) : [];
+// Bei Multipart-Requests $_POST verwenden
+if (!empty($_POST)) {
+    $bodyInput = array_merge($bodyInput, $_POST);
+}
 $getParams = array_diff_key($_GET, ['route' => true]);
 $input     = array_merge($getParams, $bodyInput);
 
@@ -71,6 +77,15 @@ $routes = [
     ['GET',    '#^api/export/csv$#',                                     'handleExportCsv'],
     ['GET',    '#^api/export/aktivitaeten$#',                            'handleExportAktivitaeten'],
     ['GET',    '#^api/aktivitaeten$#',                                   'handleListAktivitaeten'],
+
+    // Einstellungen (Erscheinungsbild)
+    ['GET',    '#^api/einstellungen$#',                                  'handleGetEinstellungen'],
+    ['POST',   '#^api/einstellungen$#',                                  'handleSaveEinstellungen'],
+    ['POST',   '#^api/einstellungen/logo$#',                             'handleLogoUpload'],
+    ['GET',    '#^api/einstellungen/logo$#',                             'handleLogoAusliefern'],
+    ['DELETE', '#^api/einstellungen/logo$#',                             'handleLogoLoeschen'],
+    ['POST',   '#^api/einstellungen/aktivieren$#',                       'handleEinstellungenAktivieren'],
+    ['POST',   '#^api/einstellungen/zuruecksetzen$#',                    'handleEinstellungenZuruecksetzen'],
 ];
 
 foreach ($routes as [$routeMethod, $pattern, $handler]) {

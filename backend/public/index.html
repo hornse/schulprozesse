@@ -11,7 +11,12 @@
 <!-- App-Shell: sticky Header mit Navigation -->
 <div id="app-shell">
   <div class="shell-brand">
-    <span class="brand-text">Friedrich-Rückert-Gymnasium · <strong>Schulprozesse</strong></span>
+    <div class="brand-left">
+      <img id="shell-logo" src="/api/einstellungen/logo" alt="Schullogo"
+           style="display:none;height:28px;width:auto;margin-right:10px;vertical-align:middle;"
+           onerror="this.style.display='none'">
+      <span class="brand-text" id="brand-text">Friedrich-Rückert-Gymnasium · <strong>Schulprozesse</strong></span>
+    </div>
     <div id="shell-user"></div>
   </div>
   <nav class="shell-nav" id="shell-nav">

@@ -562,8 +562,7 @@ function renderProzessLeiste() {
   });
 }
 
-// renderProzessVerwaltungSeite – Teilnehmer und Sichtbarkeit
-// Vorlagen-Verwaltung kommt in Schritt 2 als eigenes prozessspezifisches Konzept
+// renderProzessVerwaltungSeite – Teilnehmer, Sichtbarkeit und Aktivitätsprotokoll
 function renderProzessVerwaltungSeite() {
   const container = document.createElement('div');
   container.innerHTML = `<div class="page-header">
@@ -571,10 +570,12 @@ function renderProzessVerwaltungSeite() {
     <span class="page-subtitle">${STATE.aktiverProzess?.label ?? ''}</span>
   </div>`;
   container.appendChild(renderProzessVerwaltungInhalt());
+  // Aktivitätsprotokoll gehört zum Prozess, nicht zum allgemeinen Admin-Bereich
+  container.appendChild(renderAktivitaetsprotokoll());
   return container;
 }
 
-// renderAdminSeite – eigene Seite statt Block am Ende
+// renderAdminSeite – allgemeine Administration ohne prozessspezifische Inhalte
 function renderAdminSeite() {
   const container = document.createElement('div');
   container.innerHTML = `<div class="page-header">
@@ -584,7 +585,6 @@ function renderAdminSeite() {
   container.appendChild(renderProzesseBlock());
   container.appendChild(renderZugriffBlock());
   container.appendChild(renderVorlagenVerwaltung());
-  container.appendChild(renderAktivitaetsprotokoll());
   return container;
 }
 

@@ -189,8 +189,18 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
     }
 
     // MIME-Type serverseitig prüfen (nicht vom Client vertrauen!)
-    $finfo    = new finfo(FILEINFO_MIME_TYPE);
-    $mimeType = $finfo->file($datei['tmp_name']);
+    // finfo ist Standard in PHP 5.3+; Fallback auf mime_content_type falls nötig
+    if (class_exists('finfo')) {
+        $finfo    = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($datei['tmp_name']);
+    } elseif (function_exists('mime_content_type')) {
+        $mimeType = mime_content_type($datei['tmp_name']);
+    } else {
+        // Letzter Fallback: Dateiendung (weniger sicher, aber besser als nichts)
+        $ext      = strtolower(pathinfo($datei['name'], PATHINFO_EXTENSION));
+        $mimeType = ['png' => 'image/png', 'jpg' => 'image/jpeg',
+                     'jpeg' => 'image/jpeg', 'svg' => 'image/svg+xml'][$ext] ?? 'application/octet-stream';
+    }
 
     $erlaubteMimes = [
         'image/png'     => 'png',

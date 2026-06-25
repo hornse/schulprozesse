@@ -111,3 +111,50 @@ function handleReihenfolgePhasen(PDO $db, array $config, array $input): void
 
     Response::json(['ok' => true]);
 }
+
+function handleDeletePhase(PDO $db, array $config, array $input, array $params): void
+{
+    // Admins und Verantwortliche (für mindestens einen Prozess) dürfen Phasen löschen
+    $user = Guard::requireLogin($db);
+    if ($user['rolle'] !== 'admin') {
+        $istVerantwortlich = (int) $db->prepare(
+            "SELECT COUNT(*) FROM prozess_teilnehmer
+             WHERE webuntis_user = :u AND rolle = 'verantwortlich'"
+        )->execute([':u' => $user['webuntis_user']]) ? $db->query(
+            "SELECT COUNT(*) FROM prozess_teilnehmer
+             WHERE webuntis_user = '{$user['webuntis_user']}' AND rolle = 'verantwortlich'"
+        )->fetchColumn() : 0;
+
+        if (!$istVerantwortlich) {
+            Response::error('Nur Admins und Verantwortliche können Phasen löschen.', 403);
+        }
+    }
+
+    $id = (int) $params['id'];
+
+    // Alle Schritte der Phase und ihre Instanzen löschen (CASCADE)
+    $db->beginTransaction();
+    try {
+        // Instanzen löschen
+        $vorlagenIds = $db->prepare(
+            'SELECT id FROM schritt_vorlagen WHERE phase_id = :id'
+        );
+        $vorlagenIds->execute([':id' => $id]);
+        foreach ($vorlagenIds->fetchAll() as $v) {
+            $db->prepare('DELETE FROM schritt_instanzen WHERE vorlage_id = :vid')
+               ->execute([':vid' => $v['id']]);
+        }
+        // Vorlagen löschen
+        $db->prepare('DELETE FROM schritt_vorlagen WHERE phase_id = :id')
+           ->execute([':id' => $id]);
+        // Phase löschen
+        $db->prepare('DELETE FROM phasen WHERE id = :id')
+           ->execute([':id' => $id]);
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+
+    Response::json(['ok' => true]);
+}

@@ -1765,6 +1765,28 @@ function renderPhasenBlock(phase, vorlagen) {
   const farbWrap = document.createElement('div'); farbWrap.style.position = 'relative'; farbWrap.appendChild(farbBtn); farbWrap.appendChild(farbPopup);
 
   kopf.appendChild(griff); kopf.appendChild(farbWrap); kopf.appendChild(nummerSpan); kopf.appendChild(nameFeld);
+
+  // Löschen-Button
+  const loeschBtn = document.createElement('button');
+  loeschBtn.type = 'button';
+  loeschBtn.className = 'btn-sekundaer btn btn-gefahr';
+  loeschBtn.style.cssText = 'width:auto;font-size:11px;padding:3px 8px;margin-left:auto;flex-shrink:0;';
+  loeschBtn.textContent = '× Phase löschen';
+  loeschBtn.title = 'Phase und alle zugehörigen Schritte unwiderruflich löschen';
+  loeschBtn.addEventListener('click', async () => {
+    const anzahlSchritte = STATE.vorlagen.filter((v) => v.phase_id === phase.id).length;
+    const msg = anzahlSchritte > 0
+      ? `Phase „${phase.name}" und ${anzahlSchritte} Schritt(e) wirklich löschen?\n\nDies betrifft auch alle bestehenden Prozess-Instanzen!`
+      : `Phase „${phase.name}" wirklich löschen?`;
+    if (!confirm(msg)) return;
+    try {
+      await api(`/api/phasen/${phase.id}`, { method: 'DELETE' });
+      await ladeAlles();
+      await ladePublicDashboard();
+      render();
+    } catch (err) { alert(err.message); }
+  });
+  kopf.appendChild(loeschBtn);
   wrapper.addEventListener('dragstart', (e) => { if (e.target.closest('.vorlagen-zeile-wrapper')) return; dragZustandPhase = { id: phase.id }; wrapper.classList.add('wird-gezogen'); e.dataTransfer.effectAllowed = 'move'; });
   wrapper.addEventListener('dragend', () => { wrapper.classList.remove('wird-gezogen'); dragZustandPhase = null; });
   wrapper.appendChild(kopf);

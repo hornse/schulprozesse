@@ -67,6 +67,7 @@ $routes = [
     ['GET',    '#^api/phasen$#',                                         'handleListPhasen'],
     ['POST',   '#^api/phasen$#',                                         'handleCreatePhase'],
     ['PATCH',  '#^api/phasen/(?P<id>\d+)$#',                             'handleUpdatePhase'],
+    ['DELETE', '#^api/phasen/(?P<id>\d+)$#',                             'handleDeletePhase'],
     ['POST',   '#^api/phasen/reihenfolge$#',                             'handleReihenfolgePhasen'],
 
     ['GET',    '#^api/vorlagen-sets$#',                                  'handleListVorlagenSets'],

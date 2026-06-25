@@ -29,9 +29,35 @@ use App\Response;
 function handleListRollen(PDO $db): void
 {
     Guard::requireAdmin($db);
+
+    // Basisinfo aller freigegebenen Personen
     $rows = $db->query(
         'SELECT webuntis_user, anzeigename, rolle, erstellt_am FROM benutzer_rollen ORDER BY anzeigename'
     )->fetchAll();
+
+    // Prozess-Zugehörigkeiten für alle Personen in einer Abfrage laden
+    $teilnahmen = $db->query(
+        'SELECT pt.webuntis_user, pt.rolle AS prozess_rolle, p.label AS prozess_label
+         FROM prozess_teilnehmer pt
+         JOIN prozesse p ON p.id = pt.prozess_id
+         ORDER BY pt.webuntis_user, p.label'
+    )->fetchAll();
+
+    // Nach webuntis_user gruppieren
+    $teilnahmenMap = [];
+    foreach ($teilnahmen as $t) {
+        $teilnahmenMap[$t['webuntis_user']][] = [
+            'label' => $t['prozess_label'],
+            'rolle' => $t['prozess_rolle'],
+        ];
+    }
+
+    // Zusammenführen
+    foreach ($rows as &$row) {
+        $row['prozesse'] = $teilnahmenMap[$row['webuntis_user']] ?? [];
+    }
+    unset($row);
+
     Response::json($rows);
 }
 

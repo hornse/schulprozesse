@@ -75,6 +75,18 @@ $routes = [
     ['GET',    '#^api/vorlagen-sets/(?P<id>\d+)$#',                      'handleGetVorlagenSet'],
     ['DELETE', '#^api/vorlagen-sets/(?P<id>\d+)$#',                      'handleDeleteVorlagenSet'],
 
+    // Snapshot-Phasen bearbeiten
+    ['POST',   '#^api/vorlagen-sets/(?P<id>\d+)/phasen$#',               'handleCreateSetPhase'],
+    ['PATCH',  '#^api/vorlagen-sets/(?P<id>\d+)/phasen/(?P<pid>\d+)$#',  'handleUpdateSetPhase'],
+    ['DELETE', '#^api/vorlagen-sets/(?P<id>\d+)/phasen/(?P<pid>\d+)$#',  'handleDeleteSetPhase'],
+    ['POST',   '#^api/vorlagen-sets/(?P<id>\d+)/phasen/reihenfolge$#',   'handleReihenfolgeSetPhasen'],
+
+    // Snapshot-Schritte bearbeiten
+    ['POST',   '#^api/vorlagen-sets/(?P<id>\d+)/phasen/(?P<pid>\d+)/schritte$#',       'handleCreateSetSchritt'],
+    ['PATCH',  '#^api/vorlagen-sets/(?P<id>\d+)/schritte/(?P<sid>\d+)$#',              'handleUpdateSetSchritt'],
+    ['DELETE', '#^api/vorlagen-sets/(?P<id>\d+)/schritte/(?P<sid>\d+)$#',              'handleDeleteSetSchritt'],
+    ['POST',   '#^api/vorlagen-sets/(?P<id>\d+)/phasen/(?P<pid>\d+)/schritte/reihenfolge$#', 'handleReihenfolgeSetSchritte'],
+
     ['GET',    '#^api/export/csv$#',                                     'handleExportCsv'],
     ['GET',    '#^api/export/aktivitaeten$#',                            'handleExportAktivitaeten'],
     ['GET',    '#^api/aktivitaeten$#',                                   'handleListAktivitaeten'],

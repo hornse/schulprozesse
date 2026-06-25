@@ -1659,35 +1659,59 @@ function renderProzesseBlock() {
 
 function renderZugriffBlock() {
   const rollenBlock = document.createElement('div');
+  rollenBlock.className = 'admin-section';
+
+  const tabelleHtml = STATE.rollen.map((r) => {
+    // Prozess-Zugehörigkeiten als Badges
+    const prozessBadges = (r.prozesse ?? []).map((p) =>
+      `<span class="badge ${p.rolle === 'verantwortlich' ? 'badge-verantwortlich' : 'badge-mitarbeitend'}"
+             title="${p.rolle}">${p.label}</span>`
+    ).join(' ') || '<span style="font-size:11px;color:var(--muted);">–</span>';
+
+    return `<tr>
+      <td>${r.webuntis_user}</td>
+      <td>${r.anzeigename}</td>
+      <td><select data-rolle-user="${r.webuntis_user}" data-rolle-name="${r.anzeigename}">
+        <option value="mitglied" ${r.rolle === 'mitglied' ? 'selected' : ''}>mitglied</option>
+        <option value="admin" ${r.rolle === 'admin' ? 'selected' : ''}>admin</option>
+      </select></td>
+      <td class="prozess-badges-zelle">${prozessBadges}</td>
+      <td><button class="btn-sekundaer btn btn-gefahr" data-loeschen="${r.webuntis_user}"
+        style="width:auto;" ${r.webuntis_user === STATE.user?.webuntis_user ? 'disabled' : ''}>
+        entfernen</button></td>
+    </tr>`;
+  }).join('');
+
   rollenBlock.innerHTML = `
-    <h3 class="">Zugriff (App-Freigaben)</h3>
+    <h3>Zugriff (App-Freigaben)</h3>
     <table class="admin-tabelle">
-      <thead><tr><th>Kürzel</th><th>Name</th><th>Rolle</th><th></th></tr></thead>
-      <tbody>
-        ${STATE.rollen.map((r) => `
-          <tr>
-            <td>${r.webuntis_user}</td><td>${r.anzeigename}</td>
-            <td><select data-rolle-user="${r.webuntis_user}" data-rolle-name="${r.anzeigename}">
-              <option value="mitglied" ${r.rolle === 'mitglied' ? 'selected' : ''}>mitglied</option>
-              <option value="admin" ${r.rolle === 'admin' ? 'selected' : ''}>admin</option>
-            </select></td>
-            <td><button class="btn-sekundaer btn btn-loeschen" data-loeschen="${r.webuntis_user}"
-              style="width:auto;color:#c0392b;border-color:#c0392b;" ${r.webuntis_user === STATE.user?.webuntis_user ? 'disabled' : ''}>entfernen</button></td>
-          </tr>`).join('')}
-      </tbody>
+      <thead>
+        <tr>
+          <th>Kürzel</th><th>Name</th><th>App-Rolle</th>
+          <th>Zugewiesen in</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${tabelleHtml}</tbody>
     </table>
     <form class="inline-form" id="neue-person-form" style="margin-top:10px;">
       <div class="feld"><label>Kürzel</label><input type="text" id="neue-person-user" required></div>
       <div class="feld"><label>Name</label><input type="text" id="neue-person-name"></div>
       <div class="feld"><label>Rolle</label>
-        <select id="neue-person-rolle"><option value="mitglied">mitglied</option><option value="admin">admin</option></select>
+        <select id="neue-person-rolle">
+          <option value="mitglied">mitglied</option>
+          <option value="admin">admin</option>
+        </select>
       </div>
       <button class="btn" type="submit" style="width:auto;">Freigeben</button>
     </form>
-    <p style="font-size:11px;color:var(--muted);">Nur freigegebene Personen können sich anmelden. Danach in „Prozess verwalten" als Teilnehmer hinzufügen.</p>`;
+    <p style="font-size:11px;color:var(--muted);">
+      Nur freigegebene Personen können sich anmelden. Danach unter
+      „Prozess verwalten → Teilnehmer" dem jeweiligen Prozess zuweisen.
+    </p>`;
 
   rollenBlock.querySelectorAll('select[data-rolle-user]').forEach((sel) => {
-    sel.addEventListener('change', () => setzeRolle(sel.dataset.rolleUser, sel.value, sel.dataset.rolleName));
+    sel.addEventListener('change', () =>
+      setzeRolle(sel.dataset.rolleUser, sel.value, sel.dataset.rolleName));
   });
   rollenBlock.querySelectorAll('[data-loeschen]').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -1698,22 +1722,98 @@ function renderZugriffBlock() {
   });
   rollenBlock.querySelector('#neue-person-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const user = rollenBlock.querySelector('#neue-person-user').value.trim();
-    const name = rollenBlock.querySelector('#neue-person-name').value.trim();
+    const user  = rollenBlock.querySelector('#neue-person-user').value.trim();
+    const name  = rollenBlock.querySelector('#neue-person-name').value.trim();
     const rolle = rollenBlock.querySelector('#neue-person-rolle').value;
     if (user) setzeRolle(user, rolle, name || user);
   });
   return rollenBlock;
 }
 
-// Vorlagen-Verwaltung (Phasen + Schritte – gleiche Logik wie alte App)
+// ============================================================================
+// Vorlagenverwaltung mit Snapshot-Auswahl
+// ============================================================================
+
+// Aktuell geladener Snapshot im Editor (null = Standard/WebUntis-Vorlage)
+let aktiverSnapshotId = null;
+let aktiverSnapshot   = null; // { set, phasen, schritte }
+
 function renderVorlagenVerwaltung() {
   const block = document.createElement('div');
-  block.innerHTML = '<h3 class="">Vorlage verwalten (Phasen & Schritte)</h3>';
+  block.className = 'admin-section';
+  block.innerHTML = '<h3>Vorlagen verwalten</h3>';
 
-  const phasenListe = document.createElement('div'); phasenListe.className = 'phasen-liste';
+  // Tab-Leiste: Standard + alle Snapshots
+  const tabLeiste = document.createElement('div');
+  tabLeiste.className = 'vorlage-tabs';
+
+  function vorlageTab(id, label, aktiv) {
+    const btn = document.createElement('button');
+    btn.className = 'vorlage-tab' + (aktiv ? ' aktiv' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', async () => {
+      aktiverSnapshotId = id;
+      aktiverSnapshot   = null;
+      if (id !== null) {
+        try {
+          aktiverSnapshot = await api(`/api/vorlagen-sets/${id}`);
+        } catch { aktiverSnapshot = null; }
+      }
+      block.replaceWith(renderVorlagenVerwaltung());
+    });
+    return btn;
+  }
+
+  // Standard-Vorlage (WebUntis / globale Phasen)
+  tabLeiste.appendChild(vorlageTab(null, 'Standard (WebUntis)', aktiverSnapshotId === null));
+
+  // Snapshots
+  STATE.vorlagenSets.forEach((s) => {
+    tabLeiste.appendChild(vorlageTab(s.id, s.name, aktiverSnapshotId === s.id));
+  });
+
+  block.appendChild(tabLeiste);
+
+  // Hinweis
+  const hinweis = document.createElement('p');
+  hinweis.style.cssText = 'font-size:12px;color:var(--muted);margin:8px 0 16px;';
+  if (aktiverSnapshotId === null) {
+    hinweis.textContent = 'Standard-Vorlage: Änderungen hier betreffen neue Prozesse die ohne Snapshot-Basis angelegt werden.';
+  } else {
+    hinweis.textContent = 'Snapshot-Vorlage: Änderungen hier betreffen nur neue Prozesse die auf diesem Snapshot basieren. Bestehende Prozesse werden nicht verändert.';
+  }
+  block.appendChild(hinweis);
+
+  // Editor
+  if (aktiverSnapshotId === null) {
+    // Standard-Vorlage: bestehende Logik
+    block.appendChild(renderStandardVorlagenEditor());
+  } else if (aktiverSnapshot) {
+    // Snapshot-Editor
+    block.appendChild(renderSnapshotEditor(aktiverSnapshot, aktiverSnapshotId));
+  } else {
+    const ladeEl = document.createElement('p');
+    ladeEl.textContent = 'Lädt…'; ladeEl.style.color = 'var(--muted)';
+    block.appendChild(ladeEl);
+    // Snapshot nachladen
+    api(`/api/vorlagen-sets/${aktiverSnapshotId}`).then((data) => {
+      aktiverSnapshot = data;
+      block.replaceWith(renderVorlagenVerwaltung());
+    });
+  }
+
+  return block;
+}
+
+function renderStandardVorlagenEditor() {
+  const wrapper = document.createElement('div');
+
+  const phasenListe = document.createElement('div');
+  phasenListe.className = 'phasen-liste';
   for (const phase of STATE.phasen) {
-    const vorlagenDerPhase = STATE.vorlagen.filter((v) => v.phase_id === phase.id).sort((a, b) => a.reihenfolge - b.reihenfolge);
+    const vorlagenDerPhase = STATE.vorlagen
+      .filter((v) => v.phase_id === phase.id)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge);
     phasenListe.appendChild(renderPhasenBlock(phase, vorlagenDerPhase));
   }
   phasenListe.addEventListener('dragover', (e) => { if (dragZustandPhase) e.preventDefault(); });
@@ -1727,18 +1827,153 @@ function renderVorlagenVerwaltung() {
     const neu = zi === -1 ? [...ohne, dragZustandPhase.id] : [...ohne.slice(0, zi), dragZustandPhase.id, ...ohne.slice(zi)];
     reihenfolgePhasenAendern(neu);
   });
-  block.appendChild(phasenListe);
+  wrapper.appendChild(phasenListe);
 
-  const neuePhaseForm = document.createElement('div'); neuePhaseForm.className = 'neue-phase-form'; neuePhaseForm.style.marginTop = '14px';
-  const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.placeholder = 'Neue Phase...'; nameInput.style.cssText = 'flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;';
+  // Neue Phase
+  const neuePhaseForm = document.createElement('div');
+  neuePhaseForm.className = 'neue-phase-form';
+  neuePhaseForm.style.marginTop = '14px';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text'; nameInput.placeholder = 'Neue Phase...';
+  nameInput.style.cssText = 'flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;';
   let neuerPhaseFarbe = '#5B6FA8';
   const farbwahlNeu = renderFarbwahl(neuerPhaseFarbe, (f) => { neuerPhaseFarbe = f; });
-  const btnNeu = document.createElement('button'); btnNeu.className = 'btn'; btnNeu.style.cssText = 'width:auto;margin-top:8px;'; btnNeu.textContent = 'Phase anlegen';
-  btnNeu.addEventListener('click', () => { if (nameInput.value.trim()) neuePhase(nameInput.value.trim(), neuerPhaseFarbe); });
-  const reihe = document.createElement('div'); reihe.style.cssText = 'display:flex;gap:8px;align-items:center;';
-  reihe.appendChild(nameInput); neuePhaseForm.appendChild(reihe); neuePhaseForm.appendChild(farbwahlNeu); neuePhaseForm.appendChild(btnNeu);
-  block.appendChild(neuePhaseForm);
-  return block;
+  const btnNeu = document.createElement('button');
+  btnNeu.className = 'btn'; btnNeu.style.cssText = 'width:auto;margin-top:8px;';
+  btnNeu.textContent = 'Phase anlegen';
+  btnNeu.addEventListener('click', () => {
+    if (nameInput.value.trim()) neuePhase(nameInput.value.trim(), neuerPhaseFarbe);
+  });
+  const reihe = document.createElement('div');
+  reihe.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  reihe.appendChild(nameInput);
+  neuePhaseForm.appendChild(reihe);
+  neuePhaseForm.appendChild(farbwahlNeu);
+  neuePhaseForm.appendChild(btnNeu);
+  wrapper.appendChild(neuePhaseForm);
+  return wrapper;
+}
+
+function renderSnapshotEditor(snapshot, setId) {
+  const wrapper = document.createElement('div');
+  const phasen   = snapshot.phasen   ?? [];
+  const schritte = snapshot.schritte ?? [];
+
+  phasen.forEach((phase) => {
+    const schritteDerPhase = schritte
+      .filter((s) => s.set_phase_id === phase.id)
+      .sort((a, b) => a.reihenfolge - b.reihenfolge);
+
+    const pBlock = document.createElement('div');
+    pBlock.className = 'phasen-block';
+    pBlock.style.setProperty('--phase-farbe', phase.farbe);
+
+    // Phasen-Kopf
+    const kopf = document.createElement('div');
+    kopf.className = 'phasen-kopf';
+    const nameFeld = document.createElement('input');
+    nameFeld.type = 'text'; nameFeld.className = 'phasen-name-feld';
+    nameFeld.value = phase.name.replace(/^\d+\.\s*/, '');
+    nameFeld.addEventListener('change', () =>
+      api(`/api/vorlagen-sets/${setId}/phasen/${phase.id}`, {
+        method: 'PATCH', body: { name: nameFeld.value }
+      })
+    );
+    const loeschBtn = document.createElement('button');
+    loeschBtn.type = 'button';
+    loeschBtn.className = 'btn-sekundaer btn btn-gefahr';
+    loeschBtn.style.cssText = 'width:auto;font-size:11px;padding:3px 8px;margin-left:auto;flex-shrink:0;';
+    loeschBtn.textContent = '× Phase löschen';
+    loeschBtn.addEventListener('click', async () => {
+      if (!confirm(`Phase „${phase.name}" und alle ihre Schritte aus diesem Snapshot löschen?`)) return;
+      await api(`/api/vorlagen-sets/${setId}/phasen/${phase.id}`, { method: 'DELETE' });
+      const data = await api(`/api/vorlagen-sets/${setId}`);
+      aktiverSnapshot = data;
+      wrapper.parentElement?.parentElement?.replaceWith(renderVorlagenVerwaltung());
+    });
+    kopf.appendChild(nameFeld);
+    kopf.appendChild(loeschBtn);
+    pBlock.appendChild(kopf);
+
+    // Schritte
+    const schrittListe = document.createElement('div');
+    schrittListe.className = 'vorlagen-liste';
+    schritteDerPhase.forEach((s) => {
+      const zeile = document.createElement('div');
+      zeile.className = 'vorlagen-zeile-wrapper';
+      zeile.innerHTML = `
+        <div class="vorlagen-zeile">
+          <input type="text" class="vorlagen-titel-feld" value="${s.titel.replace(/"/g, '&quot;')}">
+          <button class="btn-sekundaer btn btn-gefahr" style="width:auto;font-size:11px;padding:3px 8px;">× löschen</button>
+        </div>`;
+      zeile.querySelector('.vorlagen-titel-feld').addEventListener('change', (e) =>
+        api(`/api/vorlagen-sets/${setId}/schritte/${s.id}`, {
+          method: 'PATCH', body: { titel: e.target.value }
+        })
+      );
+      zeile.querySelector('.btn-gefahr').addEventListener('click', async () => {
+        if (!confirm(`Schritt „${s.titel}" aus diesem Snapshot löschen?`)) return;
+        await api(`/api/vorlagen-sets/${setId}/schritte/${s.id}`, { method: 'DELETE' });
+        const data = await api(`/api/vorlagen-sets/${setId}`);
+        aktiverSnapshot = data;
+        wrapper.parentElement?.parentElement?.replaceWith(renderVorlagenVerwaltung());
+      });
+      schrittListe.appendChild(zeile);
+    });
+
+    // Neuer Schritt
+    const neuerSchrittForm = document.createElement('form');
+    neuerSchrittForm.className = 'inline-form';
+    neuerSchrittForm.style.margin = '6px 8px 10px';
+    neuerSchrittForm.innerHTML = `
+      <input type="text" placeholder="Neuer Schritt..." style="flex:1;">
+      <button class="btn" type="submit" style="width:auto;">+</button>`;
+    neuerSchrittForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const titel = neuerSchrittForm.querySelector('input').value.trim();
+      if (!titel) return;
+      await api(`/api/vorlagen-sets/${setId}/phasen/${phase.id}/schritte`, {
+        method: 'POST', body: { titel }
+      });
+      const data = await api(`/api/vorlagen-sets/${setId}`);
+      aktiverSnapshot = data;
+      wrapper.parentElement?.parentElement?.replaceWith(renderVorlagenVerwaltung());
+    });
+
+    pBlock.appendChild(schrittListe);
+    pBlock.appendChild(neuerSchrittForm);
+    wrapper.appendChild(pBlock);
+  });
+
+  // Neue Phase zum Snapshot
+  const neuePhaseForm = document.createElement('div');
+  neuePhaseForm.style.marginTop = '14px';
+  const phaseInput = document.createElement('input');
+  phaseInput.type = 'text'; phaseInput.placeholder = 'Neue Phase...';
+  phaseInput.style.cssText = 'font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;flex:1;';
+  let neuerPhaseFarbe = '#5B6FA8';
+  const farbwahlNeu = renderFarbwahl(neuerPhaseFarbe, (f) => { neuerPhaseFarbe = f; });
+  const btnPhase = document.createElement('button');
+  btnPhase.className = 'btn'; btnPhase.style.cssText = 'width:auto;margin-top:8px;';
+  btnPhase.textContent = 'Phase anlegen';
+  btnPhase.addEventListener('click', async () => {
+    const name = phaseInput.value.trim();
+    if (!name) return;
+    await api(`/api/vorlagen-sets/${setId}/phasen`, {
+      method: 'POST', body: { name, farbe: neuerPhaseFarbe }
+    });
+    const data = await api(`/api/vorlagen-sets/${setId}`);
+    aktiverSnapshot = data;
+    wrapper.parentElement?.parentElement?.replaceWith(renderVorlagenVerwaltung());
+  });
+  const reihe = document.createElement('div');
+  reihe.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  reihe.appendChild(phaseInput);
+  neuePhaseForm.appendChild(reihe);
+  neuePhaseForm.appendChild(farbwahlNeu);
+  neuePhaseForm.appendChild(btnPhase);
+  wrapper.appendChild(neuePhaseForm);
+  return wrapper;
 }
 
 function renderPhasenBlock(phase, vorlagen) {

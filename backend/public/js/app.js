@@ -2107,23 +2107,17 @@ function sammelEinstellungen(block) {
 }
 
 async function ladeLogoHoch(datei) {
-  const formData = new FormData();
-  formData.append('logo', datei);
-  const res = await fetch('/api/einstellungen/logo', {
-    method: 'POST',
-    headers: { 'X-Requested-With': 'SchuljahreswechselApp' },
-    // Content-Type NICHT setzen – Browser setzt multipart/form-data mit Boundary automatisch
-    credentials: 'same-origin',
-    body: formData,
+  // Base64-Encoding statt Multipart – umgeht Apache LimitRequestBody für Multipart
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden.'));
+    reader.readAsDataURL(datei);
   });
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Logo-Upload: Server-Antwort war kein JSON (HTTP ${res.status})`);
-  }
-  if (!res.ok) throw new Error(data.error ?? 'Logo-Upload fehlgeschlagen.');
-  return data;
+  return await api('/api/einstellungen/logo', {
+    method: 'POST',
+    body: { dateiname: datei.name, mime_type: datei.type, daten: base64 },
+  });
 }
 
 function updateBrandText() {

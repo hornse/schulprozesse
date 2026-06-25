@@ -157,53 +157,40 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
 {
     $user = Guard::requireAdmin($db);
 
-    if (empty($_FILES['logo'])) {
-        Response::error('Keine Datei übermittelt.', 400);
+    // Base64-Upload statt Multipart (umgeht Apache LimitRequestBody)
+    $base64   = $input['daten']     ?? null;
+    $mimeHint = $input['mime_type'] ?? '';
+    $dateiname = $input['dateiname'] ?? '';
+
+    if (empty($base64)) {
+        Response::error('Keine Bilddaten übermittelt.', 400);
     }
 
-    $datei = $_FILES['logo'];
-
-    // Upload-Fehler prüfen
-    if ($datei['error'] !== UPLOAD_ERR_OK) {
-        $fehler = [
-            UPLOAD_ERR_INI_SIZE   => 'Datei überschreitet server­seitiges Größenlimit.',
-            UPLOAD_ERR_FORM_SIZE  => 'Datei überschreitet das Formular-Größenlimit.',
-            UPLOAD_ERR_PARTIAL    => 'Datei wurde nur teilweise übertragen.',
-            UPLOAD_ERR_NO_FILE    => 'Keine Datei übermittelt.',
-            UPLOAD_ERR_NO_TMP_DIR => 'Temporäres Verzeichnis fehlt.',
-            UPLOAD_ERR_CANT_WRITE => 'Datei konnte nicht geschrieben werden.',
-        ];
-        Response::error($fehler[$datei['error']] ?? 'Upload-Fehler.', 400);
+    // Base64 dekodieren
+    $binaer = base64_decode($base64, strict: true);
+    if ($binaer === false) {
+        Response::error('Ungültige Base64-Daten.', 400);
     }
 
     // Größe prüfen: max. 500 KB
-    $maxBytes = 500 * 1024;
-    if ($datei['size'] > $maxBytes) {
+    if (strlen($binaer) > 500 * 1024) {
         Response::error('Logo darf maximal 500 KB groß sein.', 400);
     }
 
-    // MIME-Type serverseitig prüfen (nicht vom Client vertrauen!)
-    // finfo ist Standard in PHP 5.3+; Fallback auf mime_content_type falls nötig
-    if (class_exists('finfo')) {
-        $finfo    = new finfo(FILEINFO_MIME_TYPE);
-        $mimeType = $finfo->file($datei['tmp_name']);
-    } elseif (function_exists('mime_content_type')) {
-        $mimeType = mime_content_type($datei['tmp_name']);
-    } else {
-        // Letzter Fallback: Dateiendung (weniger sicher, aber besser als nichts)
-        $ext      = strtolower(pathinfo($datei['name'], PATHINFO_EXTENSION));
-        $mimeType = ['png' => 'image/png', 'jpg' => 'image/jpeg',
-                     'jpeg' => 'image/jpeg', 'svg' => 'image/svg+xml'][$ext] ?? 'application/octet-stream';
-    }
+    // MIME-Type via finfo prüfen (nicht dem Client vertrauen)
+    $finfo    = new finfo(FILEINFO_MIME_TYPE);
+    $tmpPfad  = tempnam(sys_get_temp_dir(), 'logo_');
+    file_put_contents($tmpPfad, $binaer);
+    $mimeType = $finfo->file($tmpPfad);
 
     $erlaubteMimes = [
         'image/png'     => 'png',
         'image/jpeg'    => 'jpg',
         'image/svg+xml' => 'svg',
-        'image/gif'     => null, // explizit ablehnen
     ];
 
-    if (!array_key_exists($mimeType, $erlaubteMimes) || $erlaubteMimes[$mimeType] === null) {
+    if (!array_key_exists($mimeType, $erlaubteMimes)) {
+        unlink($tmpPfad);
         Response::error(
             'Nur PNG, JPG und SVG sind erlaubt. Erkannter Typ: ' . htmlspecialchars($mimeType),
             400
@@ -212,11 +199,10 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
 
     // SVG: auf gefährliche Inhalte prüfen
     if ($mimeType === 'image/svg+xml') {
-        $inhalt = file_get_contents($datei['tmp_name']);
-        if (!svgIstSicher($inhalt)) {
-        Response::error(
-                'Die SVG-Datei enthält potenziell gefährliche Inhalte (Script, Event-Handler o. ä.) ' .
-                'und wurde abgelehnt.',
+        if (!svgIstSicher($binaer)) {
+            unlink($tmpPfad);
+            Response::error(
+                'Die SVG-Datei enthält potenziell gefährliche Inhalte und wurde abgelehnt.',
                 400
             );
         }
@@ -228,7 +214,7 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
         mkdir($logoDir, 0750, true);
     }
 
-    // Altes Logo löschen wenn vorhanden
+    // Altes Logo löschen
     $alterPfad = $db->query(
         "SELECT wert FROM einstellungen WHERE schluessel = 'logo_pfad'"
     )->fetchColumn();
@@ -236,14 +222,14 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
         unlink($alterPfad);
     }
 
-    // Neuen, zufälligen Dateinamen generieren (kein Original-Name!)
-    $ext       = $erlaubteMimes[$mimeType];
+    // Zufälligen Dateinamen generieren
+    $ext      = $erlaubteMimes[$mimeType];
     $neuerName = bin2hex(random_bytes(16)) . '.' . $ext;
     $zielPfad  = $logoDir . $neuerName;
 
-    if (!move_uploaded_file($datei['tmp_name'], $zielPfad)) {
-        Response::error('Logo konnte nicht gespeichert werden.', 500);
-    }
+    // Aus temp-Datei ins Ziel verschieben
+    rename($tmpPfad, $zielPfad);
+    chmod($zielPfad, 0640);
 
     // Pfad und MIME in DB speichern
     $stmt = $db->prepare(

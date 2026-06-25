@@ -100,6 +100,35 @@ sqlite3 data/app.sqlite < migrations/003_einstellungen.sql
 sqlite3 data/app.sqlite < migrations/004_instanz_anpassungen.sql
 ```
 
+**Wichtig:** Alle vier Migrationen müssen in dieser Reihenfolge eingespielt werden.
+Migration 003 legt die `einstellungen`-Tabelle an – ohne sie schlägt der
+Erscheinungsbild-Bereich komplett fehl.
+
+### Schritt 11 – PHP Backend-Server einrichten (Uberspace)
+
+Auf Uberspace läuft die App über einen PHP built-in server statt direkt über Apache.
+Das ist nötig damit Rewrite-Rules korrekt funktionieren:
+
+```bash
+# Supervisord-Config anlegen
+mkdir -p ~/etc/services.d
+cat > ~/etc/services.d/schulprozesse.ini << 'EOF'
+[program:schulprozesse]
+command=php -S 0.0.0.0:8083 /var/www/virtual/hornse/schulprozesse-src/backend/public/dev-router.php
+directory=/var/www/virtual/hornse/schulprozesse-src/backend/public
+autostart=yes
+autorestart=yes
+EOF
+
+# Service starten
+supervisorctl reread
+supervisorctl update
+supervisorctl status schulprozesse
+
+# Backend bei Uberspace registrieren
+uberspace web backend set prozesse.hornse.de/ --http --port 8083
+```
+
 ### Schritt 11 – Ersten Admin eintragen
 
 ```bash

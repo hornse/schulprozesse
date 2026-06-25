@@ -1,16 +1,5 @@
 RewriteEngine On
-
 RewriteBase /
-
-# PHP-Konfiguration für Datei-Uploads
-php_value upload_max_filesize 10M
-php_value post_max_size 10M
-php_value max_execution_time 60
-
-# Logo-Upload direkt an PHP weiterleiten (kein Rewrite-Body-Verlust)
-RewriteRule ^api/einstellungen/logo$ api-router.php?route=api/einstellungen/logo [QSA,L]
-
-# Alle anderen API-Routen
 RewriteRule ^api/(.*)$ api-router.php?route=api/$1 [QSA,L]
 
 <FilesMatch "\.sqlite$">

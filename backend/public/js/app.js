@@ -853,6 +853,8 @@ function renderSchritt(schritt) {
   const el = document.createElement('div');
   el.className = 'schritt' + (schritt.erledigt ? ' erledigt' : '') + (schritt.kann_parallel ? ' parallel' : '');
   el.style.setProperty('--accent', schritt.phase_farbe);
+  el.dataset.schrittId = schritt.id;
+  el.dataset.quelle    = schritt.quelle ?? 'vorlage';
 
   const parallelBadge = schritt.kann_parallel
     ? `<span class="parallel-badge" title="Kann parallel erledigt werden">⇉ parallel</span>` : '';
@@ -1620,8 +1622,19 @@ function renderInstanzSchrittVerwaltung() {
             const gefunden = STATE.schritte.find(
               (sc) => sc.id === s.id && sc.quelle !== 'eigen'
             );
-            if (gefunden) gefunden.instanz_titel = gespeicherterTitel;
+            if (gefunden) {
+              gefunden.instanz_titel = gespeicherterTitel;
+              gefunden.titel = gespeicherterTitel ?? gefunden.vorlage_titel;
+            }
           }
+
+          // Checklisten-DOM sofort aktualisieren ohne Neuladen
+          document.querySelectorAll('.schritt-text').forEach((el) => {
+            if (el.closest('.schritt')?.dataset?.schrittId === String(s.id) &&
+                el.closest('.schritt')?.dataset?.quelle === (s.quelle ?? 'vorlage')) {
+              el.textContent = neuerTitel || origTitel;
+            }
+          });
 
           // Visuelles Feedback
           origSpan.textContent = (s.quelle !== 'eigen' && gespeicherterTitel)

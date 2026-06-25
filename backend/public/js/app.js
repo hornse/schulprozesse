@@ -941,96 +941,180 @@ function renderZeitstrahlInhalt(liste, eingeloggt, container) {
 }
 
 function renderGantt(liste, eingeloggt) {
-  const mitDatum = liste.filter((s) => s.geplantes_datum);
+  const mitDatum  = liste.filter((s) => s.geplantes_datum);
   const ohneDatum = liste.filter((s) => !s.geplantes_datum);
-  const wrapper = document.createElement('div');
+  const wrapper   = document.createElement('div');
+
   if (mitDatum.length === 0) {
-    wrapper.appendChild(Object.assign(document.createElement('p'), { textContent: 'Noch keine Datumsangaben eingetragen.', style: 'color:var(--muted);font-size:13px;' }));
+    wrapper.appendChild(Object.assign(document.createElement('p'),
+      { textContent: 'Noch keine Datumsangaben eingetragen.', style: 'color:var(--muted);font-size:13px;' }));
     if (ohneDatum.length) wrapper.appendChild(renderOhneDatumListe(ohneDatum));
     return wrapper;
   }
-  const daten = mitDatum.flatMap((s) => s.start_datum ? [s.start_datum, s.geplantes_datum] : [s.geplantes_datum]).sort();
-  const minDatum = new Date(daten[0]), maxDatum = new Date(daten[daten.length - 1]);
-  const heute = heuteISO(), zoom = STATE.ganttZoom;
-  const spanTage = Math.max(7, Math.ceil((maxDatum - minDatum) / 86400000) + 2);
+
+  const daten      = mitDatum.flatMap((s) => s.start_datum ? [s.start_datum, s.geplantes_datum] : [s.geplantes_datum]).sort();
+  const minDatum   = new Date(daten[0]);
+  const maxDatum   = new Date(daten[daten.length - 1]);
+  const heute      = heuteISO();
+  const zoom       = STATE.ganttZoom;
+  const spanTage   = Math.max(7, Math.ceil((maxDatum - minDatum) / 86400000) + 2);
   const spanSpalten = Math.ceil(spanTage / zoom);
 
+  // Zoom-Regler
   const zoomZeile = document.createElement('div');
   zoomZeile.className = 'gantt-zoom kein-druck';
   const zoomLabels = { 1: 'Tagesansicht', 7: 'Wochenansicht' };
-  zoomZeile.innerHTML = `<span>Zoom:</span><input type="range" min="1" max="7" step="1" value="${zoom}"><span>${zoomLabels[zoom] || zoom + ' Tage/Spalte'}</span>`;
+  zoomZeile.innerHTML = `<span>Zoom:</span>
+    <input type="range" min="1" max="7" step="1" value="${zoom}">
+    <span>${zoomLabels[zoom] || zoom + ' Tage/Spalte'}</span>`;
   zoomZeile.querySelector('input').addEventListener('input', (e) => {
     STATE.ganttZoom = Number(e.target.value);
     wrapper.replaceWith(renderGantt(liste, eingeloggt));
   });
   wrapper.appendChild(zoomZeile);
 
+  // Hilfsfunktionen
+  const tagZuSpalte = (iso) =>
+    Math.floor(Math.round((new Date(iso) - minDatum) / 86400000) / zoom);
+
+  const istHeuteSpalte = (i) => {
+    const d   = new Date(minDatum); d.setDate(d.getDate() + i * zoom);
+    const endD = new Date(d.getTime() + (zoom - 1) * 86400000);
+    return d.toISOString().slice(0,10) <= heute && heute <= endD.toISOString().slice(0,10);
+  };
+
+  // Phasen-Reihenfolge
   const phasenReihenfolge = [];
   const gesehene = new Set();
-  for (const s of liste) { if (!gesehene.has(s.phase)) { phasenReihenfolge.push(s.phase); gesehene.add(s.phase); } }
+  for (const s of liste) {
+    if (!gesehene.has(s.phase)) { phasenReihenfolge.push(s.phase); gesehene.add(s.phase); }
+  }
 
-  const gantt = document.createElement('div'); gantt.className = 'gantt-wrap';
-  const kopfzeile = document.createElement('div'); kopfzeile.className = 'gantt-kopf';
-  let kopfHtml = '<div class="gantt-label-zelle"></div>';
-  // Beschriftungsintervall: bei vielen Spalten nur jeden n-ten beschriften
-  // Faustregel: maximal alle ~30px ein Label → bei typischer Spaltenbreite
+  // Datumsachse: Beschriftungsintervall dynamisch
   const labelIntervall = spanSpalten > 90 ? 14 : spanSpalten > 45 ? 7 : spanSpalten > 20 ? 3 : 1;
+
+  // ---- Echte HTML-Tabelle ----
+  // Alle Zeilen (Datum-Header + Phasen + Schritte) teilen sich dieselben
+  // Spalten → automatisch perfekte Ausrichtung, kein CSS-Grid-Workaround.
+  const tabelle = document.createElement('table');
+  tabelle.className = 'gantt-tabelle';
+  tabelle.style.cssText = 'width:100%;border-collapse:collapse;table-layout:fixed;';
+
+  // col-Gruppe: erste Spalte (Label) fest, Rest gleichmäßig
+  const colgroup = document.createElement('colgroup');
+  const colLabel = document.createElement('col');
+  colLabel.style.width = '200px';
+  colgroup.appendChild(colLabel);
+  for (let i = 0; i < spanSpalten; i++) {
+    const col = document.createElement('col');
+    colgroup.appendChild(col);
+  }
+  tabelle.appendChild(colgroup);
+
+  // thead – Datumszeile
+  const thead = document.createElement('thead');
+  const kopfZeile = document.createElement('tr');
+  const thLabel = document.createElement('th');
+  thLabel.style.cssText = 'width:200px;padding:0;border:none;';
+  kopfZeile.appendChild(thLabel);
+
   for (let i = 0; i < spanSpalten; i++) {
     const d = new Date(minDatum); d.setDate(d.getDate() + i * zoom);
-    const iso = d.toISOString().slice(0, 10);
-    const endD = new Date(d.getTime() + (zoom - 1) * 86400000);
-    const istHeuteSpalte = iso <= heute && heute <= endD.toISOString().slice(0, 10);
-    const zeigeLabel = i % labelIntervall === 0 ||
-      (d.getDate() === 1 && labelIntervall <= 7);
-    const label = zeigeLabel ? `${d.getDate()}.${d.getMonth()+1}.` : '';
-    kopfHtml += `<div class="gantt-tag ${istHeuteSpalte ? 'gantt-heute' : ''}">${label}</div>`;
+    const th = document.createElement('th');
+    th.className = 'gantt-th' + (istHeuteSpalte(i) ? ' gantt-heute' : '');
+    const zeigeLabel = i % labelIntervall === 0 || (d.getDate() === 1 && labelIntervall <= 7);
+    th.textContent = zeigeLabel ? `${d.getDate()}.${d.getMonth()+1}.` : '';
+    kopfZeile.appendChild(th);
   }
-  kopfzeile.innerHTML = kopfHtml; gantt.appendChild(kopfzeile);
+  thead.appendChild(kopfZeile);
+  tabelle.appendChild(thead);
 
-  const tagZuSpalte = (iso) => Math.floor(Math.round((new Date(iso) - minDatum) / 86400000) / zoom);
+  // tbody – Phasen und Schritte
+  const tbody = document.createElement('tbody');
   let letztePhase = null;
 
   for (const schritt of liste) {
+    // Phasen-Kopfzeile
     if (schritt.phase !== letztePhase) {
       letztePhase = schritt.phase;
       const nr = phasenReihenfolge.indexOf(schritt.phase) + 1;
-      const pZeile = document.createElement('div'); pZeile.className = 'gantt-phase-zeile';
-      let rHtml = '';
+      const tr = document.createElement('tr');
+      tr.className = 'gantt-phase-tr';
+      const tdLabel = document.createElement('td');
+      tdLabel.className = 'gantt-label gantt-phase-label';
+      tdLabel.style.color = schritt.phase_farbe;
+      tdLabel.textContent = nr + '. ' + schritt.phase.replace(/^\d+\.\s*/, '');
+      tr.appendChild(tdLabel);
       for (let i = 0; i < spanSpalten; i++) {
-        const d = new Date(minDatum); d.setDate(d.getDate() + i * zoom);
-        const endD = new Date(d.getTime() + (zoom - 1) * 86400000);
-        const ih = d.toISOString().slice(0,10) <= heute && heute <= endD.toISOString().slice(0,10);
-        rHtml += `<div class="gantt-zelle${ih ? ' gantt-heute-spalte' : ''}"></div>`;
+        const td = document.createElement('td');
+        td.className = 'gantt-zelle' + (istHeuteSpalte(i) ? ' gantt-heute-spalte' : '');
+        tr.appendChild(td);
       }
-      pZeile.innerHTML = `<div class="gantt-label-zelle gantt-phase-label" style="color:${schritt.phase_farbe};">${nr}. ${schritt.phase.replace(/^\d+\.\s*/, '')}</div><div class="gantt-raster" style="grid-template-columns:repeat(${spanSpalten},1fr);">${rHtml}</div>`;
-      gantt.appendChild(pZeile);
+      tbody.appendChild(tr);
     }
+
     if (!schritt.geplantes_datum) continue;
-    const startSpalte = schritt.start_datum ? tagZuSpalte(schritt.start_datum) : tagZuSpalte(schritt.geplantes_datum);
-    const endeSpalte = tagZuSpalte(schritt.geplantes_datum);
-    const hatBalken = startSpalte < endeSpalte;
-    const zeile = document.createElement('div'); zeile.className = 'gantt-zeile';
-    const statusKlasse = schritt.erledigt ? 'gantt-erledigt' : schritt.geplantes_datum < heute ? 'gantt-ueberfaellig' : '';
-    const meta = eingeloggt && schritt.verantwortlich_anzeigename ? ` · ${schritt.verantwortlich_anzeigename}` : '';
-    let rHtml = '';
+
+    const startSpalte = schritt.start_datum
+      ? tagZuSpalte(schritt.start_datum)
+      : tagZuSpalte(schritt.geplantes_datum);
+    const endeSpalte  = tagZuSpalte(schritt.geplantes_datum);
+    const hatBalken   = startSpalte < endeSpalte;
+    const statusKlasse = schritt.erledigt ? 'gantt-erledigt'
+      : schritt.geplantes_datum < heute ? 'gantt-ueberfaellig' : '';
+    const meta = eingeloggt && schritt.verantwortlich_anzeigename
+      ? ' · ' + schritt.verantwortlich_anzeigename : '';
+
+    const tr = document.createElement('tr');
+    tr.className = 'gantt-schritt-tr';
+
+    const tdLabel = document.createElement('td');
+    tdLabel.className = 'gantt-label gantt-schritt-label' + (schritt.erledigt ? ' erledigt' : '');
+    tdLabel.textContent = (schritt.erledigt ? '✓ ' : '') + schritt.titel + meta;
+    tr.appendChild(tdLabel);
+
     for (let i = 0; i < spanSpalten; i++) {
-      const d = new Date(minDatum); d.setDate(d.getDate() + i * zoom);
-      const endD = new Date(d.getTime() + (zoom - 1) * 86400000);
-      const ih = d.toISOString().slice(0,10) <= heute && heute <= endD.toISOString().slice(0,10);
-      let inhalt = '';
+      const td = document.createElement('td');
+      td.className = 'gantt-zelle' + (istHeuteSpalte(i) ? ' gantt-heute-spalte' : '');
+
       if (hatBalken) {
-        if (i === startSpalte) inhalt = `<div class="gantt-balken gantt-balken-start ${statusKlasse}" style="background:${schritt.phase_farbe};" title="${schritt.titel}${meta}"></div>`;
-        else if (i > startSpalte && i < endeSpalte) inhalt = `<div class="gantt-balken gantt-balken-mitte ${statusKlasse}" style="background:${schritt.phase_farbe};"></div>`;
-        else if (i === endeSpalte) inhalt = `<div class="gantt-balken gantt-balken-ende ${statusKlasse}" style="background:${schritt.phase_farbe};"></div>`;
-      } else {
-        if (i === endeSpalte) inhalt = `<div class="gantt-balken gantt-punkt ${statusKlasse}" style="background:${schritt.phase_farbe};" title="${schritt.titel}${meta}"></div>`;
+        if (i === startSpalte) {
+          const div = document.createElement('div');
+          div.className = `gantt-balken gantt-balken-start ${statusKlasse}`;
+          div.style.background = schritt.phase_farbe;
+          div.title = schritt.titel + meta;
+          td.appendChild(div);
+        } else if (i > startSpalte && i < endeSpalte) {
+          const div = document.createElement('div');
+          div.className = `gantt-balken gantt-balken-mitte ${statusKlasse}`;
+          div.style.background = schritt.phase_farbe;
+          td.appendChild(div);
+        } else if (i === endeSpalte) {
+          const div = document.createElement('div');
+          div.className = `gantt-balken gantt-balken-ende ${statusKlasse}`;
+          div.style.background = schritt.phase_farbe;
+          td.appendChild(div);
+        }
+      } else if (i === endeSpalte) {
+        const div = document.createElement('div');
+        div.className = `gantt-balken gantt-punkt ${statusKlasse}`;
+        div.style.background = schritt.phase_farbe;
+        div.title = schritt.titel + meta;
+        td.appendChild(div);
       }
-      rHtml += `<div class="gantt-zelle${ih ? ' gantt-heute-spalte' : ''}">${inhalt}</div>`;
+
+      tr.appendChild(td);
     }
-    zeile.innerHTML = `<div class="gantt-label-zelle gantt-schritt-label ${schritt.erledigt ? 'erledigt' : ''}">${schritt.erledigt ? '✓ ' : ''}${schritt.titel}${meta}</div><div class="gantt-raster" style="grid-template-columns:repeat(${spanSpalten},1fr);">${rHtml}</div>`;
-    gantt.appendChild(zeile);
+    tbody.appendChild(tr);
   }
-  wrapper.appendChild(gantt);
+
+  tabelle.appendChild(tbody);
+
+  const ganttWrap = document.createElement('div');
+  ganttWrap.className = 'gantt-wrap';
+  ganttWrap.appendChild(tabelle);
+  wrapper.appendChild(ganttWrap);
+
   if (ohneDatum.length) wrapper.appendChild(renderOhneDatumListe(ohneDatum));
   return wrapper;
 }

@@ -188,13 +188,20 @@ async function waehleProzess(id) {
   render();
 }
 
-async function toggleSchritt(id, erledigt) {
-  await api(`/api/schritte/${id}`, { method: 'PATCH', body: { erledigt } });
+async function toggleSchritt(id, erledigt, quelle) {
+  if (quelle === 'eigen') {
+    await api(`/api/instanz-schritte/${id}`, { method: 'PATCH', body: { erledigt } });
+  } else {
+    await api(`/api/schritte/${id}`, { method: 'PATCH', body: { erledigt } });
+  }
   await waehleProzess(STATE.prozessId);
 }
 
-async function aktualisiereFeld(id, feld, wert) {
-  await api(`/api/schritte/${id}`, { method: 'PATCH', body: { [feld]: wert } });
+async function aktualisiereFeld(id, feld, wert, quelle) {
+  const endpoint = quelle === 'eigen'
+    ? `/api/instanz-schritte/${id}`
+    : `/api/schritte/${id}`;
+  await api(endpoint, { method: 'PATCH', body: { [feld]: wert } });
   const sofortRerender = ['kann_parallel', 'start_datum', 'geplantes_datum'];
   if (sofortRerender.includes(feld)) {
     const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
@@ -830,17 +837,14 @@ function renderSchritt(schritt) {
 
   const parallelBadge = schritt.kann_parallel
     ? `<span class="parallel-badge" title="Kann parallel erledigt werden">⇉ parallel</span>` : '';
+  const eigenBadge = schritt.quelle === 'eigen'
+    ? `<span class="parallel-badge" style="background:var(--muted);" title="Eigener Schritt">✎ eigen</span>` : '';
 
-  el.innerHTML = `
-    <div class="schritt-zeile">
-      <span class="checkbox ${schritt.erledigt ? 'checked' : ''}" data-rolle="checkbox"></span>
-      <span class="schritt-text ${schritt.erledigt ? 'erledigt' : ''}">${schritt.titel}</span>
-      ${parallelBadge}
-      <span class="chev" data-rolle="chevron">▸</span>
-    </div>
-    <div class="schritt-detail" data-rolle="detail">
-      <div class="detail-text">${markdownZuHtml(schritt.beschreibung)}</div>
-      <div class="felder">
+  // Eigene Schritte haben vereinfachtes Detail-Panel
+  const detailFelder = schritt.quelle === 'eigen' ? `
+        <div class="feld feld-breit"><label>Kommentar</label>
+          <textarea data-feld="kommentar" rows="2" placeholder="Kurznotiz …">${schritt.kommentar ?? ''}</textarea>
+        </div>` : `
         <div class="feld"><label>Verantwortlich</label>
           <input type="text" data-feld="verantwortlich_anzeigename" value="${schritt.verantwortlich_anzeigename ?? ''}">
         </div>
@@ -858,8 +862,18 @@ function renderSchritt(schritt) {
             <input type="checkbox" data-feld="kann_parallel" ${schritt.kann_parallel ? 'checked' : ''}>
             <span class="toggle-label">für diesen Prozess</span>
           </label>
-        </div>
-      </div>
+        </div>`;
+
+  el.innerHTML = `
+    <div class="schritt-zeile">
+      <span class="checkbox ${schritt.erledigt ? 'checked' : ''}" data-rolle="checkbox"></span>
+      <span class="schritt-text ${schritt.erledigt ? 'erledigt' : ''}">${schritt.titel}</span>
+      ${parallelBadge}${eigenBadge}
+      <span class="chev" data-rolle="chevron">▸</span>
+    </div>
+    <div class="schritt-detail" data-rolle="detail">
+      <div class="detail-text">${markdownZuHtml(schritt.beschreibung)}</div>
+      <div class="felder">${detailFelder}</div>
     </div>`;
 
   const detailEl = el.querySelector('[data-rolle="detail"]');
@@ -867,7 +881,7 @@ function renderSchritt(schritt) {
   if (STATE.offeneSchritte.has(schritt.id)) { detailEl.classList.add('offen'); chevronEl.classList.add('offen'); }
 
   el.querySelector('[data-rolle="checkbox"]').addEventListener('click', (e) => {
-    e.stopPropagation(); toggleSchritt(schritt.id, !schritt.erledigt);
+    e.stopPropagation(); toggleSchritt(schritt.id, !schritt.erledigt, schritt.quelle);
   });
   el.querySelector('.schritt-zeile').addEventListener('click', () => {
     const istOffen = detailEl.classList.toggle('offen'); chevronEl.classList.toggle('offen');
@@ -876,7 +890,7 @@ function renderSchritt(schritt) {
   el.querySelectorAll('[data-feld]').forEach((input) => {
     input.addEventListener('change', () => {
       const wert = input.type === 'checkbox' ? input.checked : input.value;
-      aktualisiereFeld(schritt.id, input.dataset.feld, wert);
+      aktualisiereFeld(schritt.id, input.dataset.feld, wert, schritt.quelle);
       if (input.dataset.feld === 'kommentar') {
         const f = STATE.schritte.find((s) => s.id === schritt.id);
         if (f) f.kommentar = wert;

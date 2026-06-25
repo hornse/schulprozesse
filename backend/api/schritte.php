@@ -40,6 +40,7 @@ function handleListSchritte(PDO $db, array $config, array $input): void
 
     $nurAktive = empty($input['alle']); // alle=1 liefert auch deaktivierte (für Verwaltung)
 
+    // Vorlage-basierte Schritte
     $stmt = $db->prepare(
         'SELECT si.id, si.erledigt, si.verantwortlich_user, si.verantwortlich_anzeigename,
                 si.start_datum, si.geplantes_datum, si.erledigt_am, si.erledigt_von,
@@ -48,18 +49,42 @@ function handleListSchritte(PDO $db, array $config, array $input): void
                 p.name AS phase, p.farbe AS phase_farbe, p.reihenfolge AS phase_reihenfolge,
                 sv.reihenfolge AS vorlage_reihenfolge, sv.titel AS vorlage_titel,
                 sv.beschreibung,
-                COALESCE(si.instanz_titel, sv.titel)           AS titel,
-                COALESCE(si.instanz_reihenfolge, sv.reihenfolge) AS reihenfolge
+                COALESCE(si.instanz_titel, sv.titel)             AS titel,
+                COALESCE(si.instanz_reihenfolge, sv.reihenfolge) AS reihenfolge,
+                "vorlage" AS quelle
          FROM schritt_instanzen si
          JOIN schritt_vorlagen sv ON sv.id = si.vorlage_id
          JOIN phasen p ON p.id = sv.phase_id
          WHERE si.prozess_id = :pid' .
-        ($nurAktive ? ' AND si.deaktiviert = 0' : '') . '
-         ORDER BY p.reihenfolge, COALESCE(si.instanz_reihenfolge, sv.reihenfolge)'
+        ($nurAktive ? ' AND si.deaktiviert = 0' : '')
     );
     $stmt->execute([':pid' => $prozessId]);
+    $vorlagenSchritte = $stmt->fetchAll();
 
-    Response::json(['prozess_id' => $prozessId, 'schritte' => $stmt->fetchAll()]);
+    // Prozessspezifische Schritte (ohne Vorlage)
+    $stmtEigen = $db->prepare(
+        'SELECT id, erledigt,
+                NULL AS verantwortlich_user, NULL AS verantwortlich_anzeigename,
+                NULL AS start_datum, NULL AS geplantes_datum,
+                erledigt_am, erledigt_von,
+                kommentar, 0 AS kann_parallel, deaktiviert,
+                NULL AS instanz_titel, NULL AS instanz_reihenfolge,
+                phase_name AS phase, phase_farbe, 999 AS phase_reihenfolge,
+                reihenfolge AS vorlage_reihenfolge, titel AS vorlage_titel,
+                beschreibung,
+                titel, reihenfolge,
+                "eigen" AS quelle
+         FROM instanz_schritte
+         WHERE prozess_id = :pid' .
+        ($nurAktive ? ' AND deaktiviert = 0' : '')
+    );
+    $stmtEigen->execute([':pid' => $prozessId]);
+    $eigenSchritte = $stmtEigen->fetchAll();
+
+    // Zusammenführen: Vorlage-Schritte zuerst, dann eigene
+    $alle = array_merge($vorlagenSchritte, $eigenSchritte);
+
+    Response::json(['prozess_id' => $prozessId, 'schritte' => $alle]);
 }
 
 function handleUpdateSchritt(PDO $db, array $config, array $input, array $params): void

@@ -1553,10 +1553,16 @@ async function ladeLogoHoch(datei) {
   const res = await fetch('/api/einstellungen/logo', {
     method: 'POST',
     headers: { 'X-Requested-With': 'SchuljahreswechselApp' },
+    // Content-Type NICHT setzen – Browser setzt multipart/form-data mit Boundary automatisch
     credentials: 'same-origin',
     body: formData,
   });
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Logo-Upload: Server-Antwort war kein JSON (HTTP ${res.status})`);
+  }
   if (!res.ok) throw new Error(data.error ?? 'Logo-Upload fehlgeschlagen.');
   return data;
 }

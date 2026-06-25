@@ -155,13 +155,9 @@ function handleSaveEinstellungen(PDO $db, array $config, array $input): void
 
 function handleLogoUpload(PDO $db, array $config, array $input): void
 {
-    // Output-Buffer starten damit PHP-Warnings die JSON-Antwort nicht kaputtmachen
-    ob_start();
-
     $user = Guard::requireAdmin($db);
 
     if (empty($_FILES['logo'])) {
-        ob_end_clean();
         Response::error('Keine Datei übermittelt.', 400);
     }
 
@@ -177,14 +173,12 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
             UPLOAD_ERR_NO_TMP_DIR => 'Temporäres Verzeichnis fehlt.',
             UPLOAD_ERR_CANT_WRITE => 'Datei konnte nicht geschrieben werden.',
         ];
-        ob_end_clean();
         Response::error($fehler[$datei['error']] ?? 'Upload-Fehler.', 400);
     }
 
     // Größe prüfen: max. 500 KB
     $maxBytes = 500 * 1024;
     if ($datei['size'] > $maxBytes) {
-        ob_end_clean();
         Response::error('Logo darf maximal 500 KB groß sein.', 400);
     }
 
@@ -210,7 +204,6 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
     ];
 
     if (!array_key_exists($mimeType, $erlaubteMimes) || $erlaubteMimes[$mimeType] === null) {
-        ob_end_clean();
         Response::error(
             'Nur PNG, JPG und SVG sind erlaubt. Erkannter Typ: ' . htmlspecialchars($mimeType),
             400
@@ -221,7 +214,6 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
     if ($mimeType === 'image/svg+xml') {
         $inhalt = file_get_contents($datei['tmp_name']);
         if (!svgIstSicher($inhalt)) {
-            ob_end_clean();
         Response::error(
                 'Die SVG-Datei enthält potenziell gefährliche Inhalte (Script, Event-Handler o. ä.) ' .
                 'und wurde abgelehnt.',
@@ -250,7 +242,6 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
     $zielPfad  = $logoDir . $neuerName;
 
     if (!move_uploaded_file($datei['tmp_name'], $zielPfad)) {
-        ob_end_clean();
         Response::error('Logo konnte nicht gespeichert werden.', 500);
     }
 
@@ -261,8 +252,6 @@ function handleLogoUpload(PDO $db, array $config, array $input): void
     );
     $stmt->execute([':k' => 'logo_pfad', ':v' => $zielPfad,  ':u' => $user['webuntis_user']]);
     $stmt->execute([':k' => 'logo_mime', ':v' => $mimeType,   ':u' => $user['webuntis_user']]);
-
-    ob_end_clean();
         Response::json(['ok' => true, 'mime' => $mimeType]);
 }
 

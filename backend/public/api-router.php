@@ -47,6 +47,12 @@ $routes = [
     ['GET',    '#^api/schritte$#',                                       'handleListSchritte'],
     ['PATCH',  '#^api/schritte/(?P<id>\d+)$#',                           'handleUpdateSchritt'],
 
+    // Prozessspezifische Schritte (ohne globale Vorlage)
+    ['GET',    '#^api/prozesse/(?P<prozess_id>\d+)/instanz-schritte$#',  'handleListInstanzSchritte'],
+    ['POST',   '#^api/prozesse/(?P<prozess_id>\d+)/instanz-schritte$#',  'handleCreateInstanzSchritt'],
+    ['PATCH',  '#^api/instanz-schritte/(?P<id>\d+)$#',                   'handleUpdateInstanzSchritt'],
+    ['DELETE', '#^api/instanz-schritte/(?P<id>\d+)$#',                   'handleDeleteInstanzSchritt'],
+
     ['GET',    '#^api/prozesse$#',                                       'handleListProzesse'],
     ['POST',   '#^api/prozesse$#',                                       'handleCreateProzess'],
     ['PATCH',  '#^api/prozesse/(?P<id>\d+)$#',                           'handleUpdateProzess'],

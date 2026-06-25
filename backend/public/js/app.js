@@ -562,7 +562,7 @@ function renderProzessLeiste() {
   });
 }
 
-// renderProzessVerwaltungSeite – Teilnehmer, Sichtbarkeit und Aktivitätsprotokoll
+// renderProzessVerwaltungSeite – Teilnehmer, Sichtbarkeit, eigene Schritte und Aktivitätsprotokoll
 function renderProzessVerwaltungSeite() {
   const container = document.createElement('div');
   container.innerHTML = `<div class="page-header">
@@ -570,7 +570,7 @@ function renderProzessVerwaltungSeite() {
     <span class="page-subtitle">${STATE.aktiverProzess?.label ?? ''}</span>
   </div>`;
   container.appendChild(renderProzessVerwaltungInhalt());
-  // Aktivitätsprotokoll gehört zum Prozess, nicht zum allgemeinen Admin-Bereich
+  container.appendChild(renderInstanzSchrittVerwaltung());
   container.appendChild(renderAktivitaetsprotokoll());
   return container;
 }
@@ -1361,6 +1361,258 @@ function renderProzessVerwaltungInhalt() {
   return container;
 }
 
+// ============================================================================
+// Prozessspezifische Schritt-Verwaltung
+// Verantwortliche können hier:
+//   - Vorlage-Schritte umbenennen (nur für diesen Prozess)
+//   - Vorlage-Schritte deaktivieren (ausblenden in diesem Prozess)
+//   - Eigene Schritte hinzufügen die nur in diesem Prozess erscheinen
+// Die globale Vorlage wird dabei NICHT verändert.
+// ============================================================================
+// ============================================================================
+// Prozessspezifische Schritt-Verwaltung
+// Verantwortliche können:
+//   - Vorlage-Schritte umbenennen oder deaktivieren (nur für diesen Prozess)
+//   - Neue Phasen anlegen (nur für diesen Prozess)
+//   - Zu diesen Phasen neue Schritte hinzufügen
+// Die globale Vorlage wird dabei NICHT verändert.
+// ============================================================================
+
+// Puffer für neue instanzspezifische Phasen (phase_name → { farbe })
+let instanzPhasenPuffer = {};
+
+function renderInstanzSchrittVerwaltung() {
+  const block = document.createElement('div');
+  block.className = 'admin-section';
+
+  const header = document.createElement('div');
+  header.innerHTML = `
+    <h3>Schritte dieses Prozesses anpassen</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px;">
+      Änderungen hier betreffen nur diesen Prozess –
+      globale Vorlage und andere Prozesse bleiben unberührt.
+    </p>`;
+  block.appendChild(header);
+
+  // ---- Teil 1: Vorlage-Schritte anpassen ----
+  const vorlagenTitel = document.createElement('h4');
+  vorlagenTitel.style.cssText = 'font-size:13px;font-weight:600;margin:0 0 8px;';
+  vorlagenTitel.textContent = 'Vorlage-Schritte anpassen';
+  block.appendChild(vorlagenTitel);
+
+  const liste = document.createElement('div');
+  liste.className = 'instanz-schritte-liste';
+  block.appendChild(liste);
+
+  ladeProzessSchritteMitDeaktivierten(STATE.prozessId).then((alle) => {
+    if (alle.length === 0) {
+      liste.innerHTML = '<p style="font-size:12px;color:var(--muted);">Keine Vorlage-Schritte vorhanden.</p>';
+    } else {
+      let aktuellePhase = null;
+      alle.forEach((s) => {
+        if (s.phase !== aktuellePhase) {
+          aktuellePhase = s.phase;
+          const pt = document.createElement('div');
+          pt.className = 'instanz-phase-titel';
+          pt.style.color = s.phase_farbe;
+          pt.textContent = s.phase;
+          liste.appendChild(pt);
+        }
+        const zeile = document.createElement('div');
+        zeile.className = 'instanz-schritt-zeile' + (s.deaktiviert ? ' deaktiviert' : '');
+        const origTitel = s.vorlage_titel ?? s.titel ?? '';
+        const anzeigetitel = s.instanz_titel ?? origTitel;
+        zeile.innerHTML = `
+          <input type="text" class="instanz-titel-feld"
+                 value="${anzeigetitel.replace(/"/g, '&quot;')}"
+                 placeholder="${origTitel.replace(/"/g, '&quot;')}"
+                 title="Umbenennen (nur für diesen Prozess)">
+          <span class="instanz-orig">${s.instanz_titel ? '← ' + origTitel : ''}</span>
+          <button class="btn-sekundaer btn" data-toggle-deakt
+                  style="width:auto;font-size:11px;padding:3px 8px;">
+            ${s.deaktiviert ? '↩ reaktivieren' : '✕ ausblenden'}
+          </button>`;
+        zeile.querySelector('.instanz-titel-feld').addEventListener('change', async (e) => {
+          await api(`/api/schritte/${s.id}`, {
+            method: 'PATCH', body: { instanz_titel: e.target.value.trim() || null }
+          });
+          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+          STATE.schritte = res.schritte;
+          block.replaceWith(renderInstanzSchrittVerwaltung());
+        });
+        zeile.querySelector('[data-toggle-deakt]').addEventListener('click', async () => {
+          await api(`/api/schritte/${s.id}`, {
+            method: 'PATCH', body: { deaktiviert: s.deaktiviert ? 0 : 1 }
+          });
+          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+          STATE.schritte = res.schritte;
+          block.replaceWith(renderInstanzSchrittVerwaltung());
+        });
+        liste.appendChild(zeile);
+      });
+    }
+  });
+
+  // ---- Teil 2: Eigene Phasen und Schritte ----
+  const sep = document.createElement('hr');
+  sep.style.cssText = 'border:none;border-top:1px solid var(--line);margin:20px 0;';
+  block.appendChild(sep);
+
+  const eigeneTitel = document.createElement('h4');
+  eigeneTitel.style.cssText = 'font-size:13px;font-weight:600;margin:0 0 6px;';
+  eigeneTitel.textContent = 'Eigene Phasen und Schritte';
+  const eigeneHinweis = document.createElement('p');
+  eigeneHinweis.style.cssText = 'font-size:12px;color:var(--muted);margin:0 0 14px;';
+  eigeneHinweis.textContent =
+    'Eigene Phasen und Schritte erscheinen nur in diesem Prozess und haben keine Vorlage.';
+  block.appendChild(eigeneTitel);
+  block.appendChild(eigeneHinweis);
+
+  // Bestehende eigene Phasen/Schritte anzeigen
+  api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`).then((eigene) => {
+    if (eigene.length === 0) return;
+
+    // Nach Phase gruppieren
+    const phasenMap = new Map();
+    eigene.forEach((s) => {
+      if (!phasenMap.has(s.phase_name)) phasenMap.set(s.phase_name, []);
+      phasenMap.get(s.phase_name).push(s);
+    });
+
+    phasenMap.forEach((schritte, phaseName) => {
+      const phaseTitel = document.createElement('div');
+      phaseTitel.className = 'instanz-phase-titel';
+      phaseTitel.style.color = schritte[0].phase_farbe;
+      phaseTitel.textContent = phaseName + ' (eigene Phase)';
+      block.insertBefore(phaseTitel, neuePhaseBlock);
+
+      schritte.forEach((s) => {
+        const zeile = document.createElement('div');
+        zeile.className = 'instanz-schritt-zeile';
+        zeile.innerHTML = `
+          <input type="text" class="instanz-titel-feld"
+                 value="${s.titel.replace(/"/g, '&quot;')}">
+          <span class="instanz-orig">eigener Schritt</span>
+          <button class="btn-sekundaer btn btn-gefahr"
+                  style="width:auto;font-size:11px;padding:3px 8px;">✕ löschen</button>`;
+        zeile.querySelector('.instanz-titel-feld').addEventListener('change', async (e) => {
+          await api(`/api/instanz-schritte/${s.id}`, {
+            method: 'PATCH', body: { titel: e.target.value.trim() }
+          });
+        });
+        zeile.querySelector('.btn-gefahr').addEventListener('click', async () => {
+          if (!confirm(`Schritt „${s.titel}" löschen?`)) return;
+          await api(`/api/instanz-schritte/${s.id}`, { method: 'DELETE' });
+          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+          STATE.schritte = res.schritte;
+          block.replaceWith(renderInstanzSchrittVerwaltung());
+        });
+        block.insertBefore(zeile, neuePhaseBlock);
+      });
+    });
+  });
+
+  // Neue Phase + Schritte anlegen
+  const neuePhaseBlock = document.createElement('div');
+  neuePhaseBlock.className = 'neue-instanz-phase-form';
+
+  let neueInstanzFarbe = '#7F8C8D';
+  const farbwahlInstanz = renderFarbwahl(neueInstanzFarbe, (f) => { neueInstanzFarbe = f; });
+
+  neuePhaseBlock.innerHTML = `
+    <h5 style="font-size:12px;font-weight:600;margin:0 0 8px;color:var(--muted);">
+      Neue Phase anlegen
+    </h5>`;
+  const phaseReihe = document.createElement('div');
+  phaseReihe.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
+  const phaseInput = document.createElement('input');
+  phaseInput.type = 'text'; phaseInput.placeholder = 'Phasenname, z. B. Nachbereitung';
+  phaseInput.style.cssText = 'flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;';
+  phaseReihe.appendChild(phaseInput);
+  neuePhaseBlock.appendChild(phaseReihe);
+  neuePhaseBlock.appendChild(farbwahlInstanz);
+
+  // Schritt-Liste für die neue Phase
+  let neueSchritte = [];
+  const schrittContainer = document.createElement('div');
+  schrittContainer.style.marginTop = '10px';
+  schrittContainer.className = 'instanz-schritte-liste';
+
+  function schrittZeileNeu(titel, idx) {
+    const z = document.createElement('div');
+    z.className = 'instanz-schritt-zeile';
+    z.innerHTML = `
+      <span style="font-size:13px;flex:1;">${titel}</span>
+      <button class="btn-sekundaer btn btn-gefahr"
+              style="width:auto;font-size:11px;padding:3px 8px;">✕</button>`;
+    z.querySelector('button').addEventListener('click', () => {
+      neueSchritte.splice(idx, 1);
+      schrittContainer.innerHTML = '';
+      neueSchritte.forEach((t, i) => schrittContainer.appendChild(schrittZeileNeu(t, i)));
+    });
+    return z;
+  }
+
+  const neuerSchrittForm = document.createElement('form');
+  neuerSchrittForm.className = 'inline-form';
+  neuerSchrittForm.style.marginTop = '8px';
+  neuerSchrittForm.innerHTML = `
+    <input type="text" id="neuer-instanz-schritt" placeholder="Schritt hinzufügen..."
+           style="flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;">
+    <button class="btn-sekundaer btn" type="submit" style="width:auto;">+ Schritt</button>`;
+  neuerSchrittForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const titel = neuerSchrittForm.querySelector('#neuer-instanz-schritt').value.trim();
+    if (!titel) return;
+    neueSchritte.push(titel);
+    schrittContainer.innerHTML = '';
+    neueSchritte.forEach((t, i) => schrittContainer.appendChild(schrittZeileNeu(t, i)));
+    neuerSchrittForm.querySelector('#neuer-instanz-schritt').value = '';
+  });
+
+  const speichernBtn = document.createElement('button');
+  speichernBtn.className = 'btn';
+  speichernBtn.style.cssText = 'width:auto;margin-top:12px;';
+  speichernBtn.textContent = 'Phase mit Schritten speichern';
+  speichernBtn.addEventListener('click', async () => {
+    const phaseName = phaseInput.value.trim();
+    if (!phaseName) { alert('Bitte einen Phasennamen eingeben.'); return; }
+    if (neueSchritte.length === 0) { alert('Bitte mindestens einen Schritt hinzufügen.'); return; }
+
+    // Alle Schritte dieser Phase anlegen
+    for (const titel of neueSchritte) {
+      await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
+        method: 'POST',
+        body: { titel, phase_name: phaseName, phase_farbe: neueInstanzFarbe }
+      });
+    }
+
+    // Schritte neu laden
+    const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+    STATE.schritte = res.schritte;
+    block.replaceWith(renderInstanzSchrittVerwaltung());
+  });
+
+  neuePhaseBlock.appendChild(schrittContainer);
+  neuePhaseBlock.appendChild(neuerSchrittForm);
+  neuePhaseBlock.appendChild(speichernBtn);
+  block.appendChild(neuePhaseBlock);
+  return block;
+}
+
+async function ladeProzessSchritteMitDeaktivierten(prozessId) {
+  try {
+    const res = await fetch(
+      `/api/schritte?prozess_id=${prozessId}&alle=1`,
+      { headers: { 'X-Requested-With': 'SchuljahreswechselApp' }, credentials: 'same-origin' }
+    );
+    const data = await res.json();
+    return data.schritte ?? [];
+  } catch { return []; }
+}
+
+// ============================================================================
+// Admin-Inhaltsblöcke (genutzt von renderAdminSeite)
 // ============================================================================
 // Admin-Inhaltsblöcke (genutzt von renderAdminSeite)
 // ============================================================================

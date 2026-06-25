@@ -64,8 +64,8 @@ function handleListSchritte(PDO $db, array $config, array $input): void
     // Prozessspezifische Schritte (ohne Vorlage)
     $stmtEigen = $db->prepare(
         'SELECT id, erledigt,
-                NULL AS verantwortlich_user, NULL AS verantwortlich_anzeigename,
-                NULL AS start_datum, NULL AS geplantes_datum,
+                verantwortlich_anzeigename, verantwortlich_anzeigename AS verantwortlich_user,
+                start_datum, geplantes_datum,
                 erledigt_am, erledigt_von,
                 kommentar, 0 AS kann_parallel, deaktiviert,
                 NULL AS instanz_titel, NULL AS instanz_reihenfolge,
@@ -267,7 +267,8 @@ function handleUpdateInstanzSchritt(PDO $db, array $config, array $input, array 
 
     $sets = []; $werte = [':id' => $id];
     $felder = ['titel', 'beschreibung', 'phase_name', 'phase_farbe',
-               'reihenfolge', 'kommentar'];
+               'reihenfolge', 'kommentar',
+               'verantwortlich_anzeigename', 'start_datum', 'geplantes_datum'];
     foreach ($felder as $f) {
         if (array_key_exists($f, $input)) {
             $sets[] = "$f = :$f"; $werte[":$f"] = $input[$f];

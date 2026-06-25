@@ -840,11 +840,8 @@ function renderSchritt(schritt) {
   const eigenBadge = schritt.quelle === 'eigen'
     ? `<span class="parallel-badge" style="background:var(--muted);" title="Eigener Schritt">✎ eigen</span>` : '';
 
-  // Eigene Schritte haben vereinfachtes Detail-Panel
-  const detailFelder = schritt.quelle === 'eigen' ? `
-        <div class="feld feld-breit"><label>Kommentar</label>
-          <textarea data-feld="kommentar" rows="2" placeholder="Kurznotiz …">${schritt.kommentar ?? ''}</textarea>
-        </div>` : `
+  // Eigene Schritte bekommen dasselbe Detail-Panel wie Vorlage-Schritte
+  const detailFelder = `
         <div class="feld"><label>Verantwortlich</label>
           <input type="text" data-feld="verantwortlich_anzeigename" value="${schritt.verantwortlich_anzeigename ?? ''}">
         </div>
@@ -854,15 +851,16 @@ function renderSchritt(schritt) {
         <div class="feld"><label>Zieldatum</label>
           <input type="date" data-feld="geplantes_datum" value="${schritt.geplantes_datum ?? ''}">
         </div>
-        <div class="feld feld-breit"><label>Kommentar (nur für Angemeldete)</label>
+        <div class="feld feld-breit"><label>Kommentar</label>
           <textarea data-feld="kommentar" rows="2" placeholder="Kurznotiz …">${schritt.kommentar ?? ''}</textarea>
         </div>
+        ${schritt.quelle !== 'eigen' ? `
         <div class="feld"><label>Parallel möglich</label>
           <label class="toggle-wrap">
             <input type="checkbox" data-feld="kann_parallel" ${schritt.kann_parallel ? 'checked' : ''}>
             <span class="toggle-label">für diesen Prozess</span>
           </label>
-        </div>`;
+        </div>` : ''}`;
 
   el.innerHTML = `
     <div class="schritt-zeile">
@@ -1494,11 +1492,40 @@ function renderInstanzSchrittVerwaltung() {
     });
 
     phasenMap.forEach((schritte, phaseName) => {
-      const phaseTitel = document.createElement('div');
-      phaseTitel.className = 'instanz-phase-titel';
-      phaseTitel.style.color = schritte[0].phase_farbe;
-      phaseTitel.textContent = phaseName + ' (eigene Phase)';
-      block.insertBefore(phaseTitel, neuePhaseBlock);
+      const phaseFarbe = schritte[0].phase_farbe;
+      const phaseHeader = document.createElement('div');
+      phaseHeader.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 4px;';
+
+      // Farb-Vorschau + Edit
+      const farbVorschau = document.createElement('div');
+      farbVorschau.style.cssText = `width:14px;height:14px;border-radius:3px;background:${phaseFarbe};flex-shrink:0;`;
+
+      const phaseTitelInput = document.createElement('input');
+      phaseTitelInput.type = 'text';
+      phaseTitelInput.value = phaseName;
+      phaseTitelInput.style.cssText = 'font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:none;background:none;color:var(--ink);padding:2px 4px;border-radius:4px;flex:1;';
+      phaseTitelInput.addEventListener('focus', () => {
+        phaseTitelInput.style.background = 'var(--paper)';
+        phaseTitelInput.style.border = '1px solid var(--line)';
+      });
+      phaseTitelInput.addEventListener('blur', async () => {
+        phaseTitelInput.style.background = 'none';
+        phaseTitelInput.style.border = 'none';
+        const neuerName = phaseTitelInput.value.trim();
+        if (neuerName && neuerName !== phaseName) {
+          // Alle Schritte dieser Phase umbenennen
+          for (const s of schritte) {
+            await api(`/api/instanz-schritte/${s.id}`, {
+              method: 'PATCH', body: { phase_name: neuerName }
+            });
+          }
+          block.replaceWith(renderInstanzSchrittVerwaltung());
+        }
+      });
+
+      phaseHeader.appendChild(farbVorschau);
+      phaseHeader.appendChild(phaseTitelInput);
+      block.insertBefore(phaseHeader, neuePhaseBlock);
 
       schritte.forEach((s) => {
         const zeile = document.createElement('div');

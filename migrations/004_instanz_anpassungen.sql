@@ -41,3 +41,8 @@ CREATE TABLE IF NOT EXISTS instanz_schritte (
 
 CREATE INDEX IF NOT EXISTS idx_instanz_schritte_prozess
   ON instanz_schritte(prozess_id, deaktiviert);
+
+-- Felder für vollständige Checklisten-Funktionalität bei eigenen Schritten
+ALTER TABLE instanz_schritte ADD COLUMN verantwortlich_anzeigename TEXT;
+ALTER TABLE instanz_schritte ADD COLUMN start_datum TEXT;
+ALTER TABLE instanz_schritte ADD COLUMN geplantes_datum TEXT;

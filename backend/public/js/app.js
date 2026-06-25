@@ -2725,7 +2725,8 @@ function renderHilfeSeite() {
   tabLeiste.className = 'zeitstrahl-tabs';
   tabLeiste.innerHTML = `
     <button class="zt-tab aktiv" data-hilfe="erste-schritte">Erste Schritte</button>
-    <button class="zt-tab" data-hilfe="faq">Häufige Fragen (FAQ)</button>`;
+    <button class="zt-tab" data-hilfe="faq">Häufige Fragen (FAQ)</button>
+    <button class="zt-tab" data-hilfe="handbuch">Vollständiges Handbuch</button>`;
 
   const inhalt = document.createElement('div');
   inhalt.className = 'hilfe-inhalt';
@@ -2735,7 +2736,9 @@ function renderHilfeSeite() {
     tabLeiste.querySelectorAll('.zt-tab').forEach((b) =>
       b.classList.toggle('aktiv', b.dataset.hilfe === id));
     inhalt.innerHTML = '';
-    inhalt.appendChild(id === 'erste-schritte' ? renderErsteSchritte(schulname, appTitel) : renderFaq(schulname));
+    if (id === 'erste-schritte') inhalt.appendChild(renderErsteSchritte(schulname, appTitel));
+    else if (id === 'faq')       inhalt.appendChild(renderFaq(schulname));
+    else                         inhalt.appendChild(renderHandbuch(schulname));
   }
 
   tabLeiste.querySelectorAll('[data-hilfe]').forEach((btn) =>
@@ -2924,6 +2927,188 @@ function renderFaq(schulname) {
 // ============================================================================
 // Start
 // ============================================================================
+// ============================================================================
+// Vollständiges Handbuch
+// ============================================================================
+function renderHandbuch(schulname) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'handbuch';
+
+  const kapitel = [
+    {
+      titel: 'Übersicht',
+      inhalt: `
+        <p>Die App koordiniert wiederkehrende schulische Prozesse als digitale Checklisten.
+        Jeder Prozess basiert auf einer Vorlage – wie ein Objekt auf einer Klasse in der
+        Programmierung. Anpassungen am Prozess berühren nie die Vorlage.</p>
+        <p><strong>Beispiel:</strong> Vorlage „WebUntis-Wechsel" → konkreter Prozess
+        „WebUntis Schuljahreswechsel 2026/2027" mit eigenen Phasennamen, Farben und
+        zusätzlichen Schritten.</p>`,
+    },
+    {
+      titel: 'Anmeldung',
+      inhalt: `
+        <p>Oben rechts „Anmelden" klicken, WebUntis-Zugangsdaten eingeben.</p>
+        <p>Zwei Bedingungen müssen erfüllt sein:</p>
+        <ul>
+          <li>Ein Admin muss dich in der App freigegeben haben (unter Admin → Zugriff)</li>
+          <li>Ein Verantwortlicher oder Admin muss dich einem Prozess zugewiesen haben</li>
+        </ul>
+        <p>Bei Problemen: Admin der App an ${schulname} kontaktieren.</p>`,
+    },
+    {
+      titel: 'Navigation',
+      inhalt: `
+        <p>Der Header hat zwei Zeilen:</p>
+        <ul>
+          <li><strong>Zeile 1</strong> – Schulname links, Benutzer + Abmelden rechts</li>
+          <li><strong>Zeile 2</strong> – Haupttabs: Dashboard · Checkliste · Zeitstrahl ·
+            Prozess verwalten · Admin · Hilfe</li>
+        </ul>
+        <p>Direkt darunter die <strong>Prozess-Tabs</strong> – ein Tab pro Prozess dem
+        du zugewiesen bist. Klick wechselt den aktiven Prozess in allen Ansichten.</p>
+        <p>„Prozess verwalten" erscheint nur wenn du für mindestens einen Prozess
+        verantwortlich bist. Dort sind nur deine verantwortlichen Prozesse als Tabs sichtbar.</p>`,
+    },
+    {
+      titel: 'Dashboard',
+      inhalt: `
+        <p>Zeigt ohne Anmeldung alle öffentlichen Prozesse. Nach Anmeldung den aktuell
+        gewählten Prozess mit:</p>
+        <ul>
+          <li>Welcher Schritt gerade dran ist</li>
+          <li>Überfällige Schritte (Zieldatum überschritten)</li>
+          <li>Schritte in den nächsten 14 Tagen</li>
+          <li>Fortschritt je Phase als Balken</li>
+        </ul>
+        <p>Kommentare und Verantwortliche sind nur nach Anmeldung sichtbar.</p>`,
+    },
+    {
+      titel: 'Checkliste',
+      inhalt: `
+        <p>Jeden Schritt anklicken zum Aufklappen:</p>
+        <ul>
+          <li><strong>Häkchen</strong> – als erledigt markieren, wird protokolliert</li>
+          <li><strong>Verantwortlich</strong> – wer diesen Schritt übernimmt</li>
+          <li><strong>Start / Zieldatum</strong> – Zeitraum für den Gantt-Balken</li>
+          <li><strong>Kommentar</strong> – nur für Angemeldete sichtbar</li>
+          <li><strong>Weiterführende Infos</strong> – Markdown-Hinweise von Admins/Verantwortlichen</li>
+        </ul>
+        <p>Eigene Schritte (von Verantwortlichen angelegt) haben ein graues
+        „✎ eigen"-Badge und dasselbe Detail-Panel.</p>
+        <p>Export: ⬇ CSV (öffnet in Excel) und 🖨 PDF.</p>`,
+    },
+    {
+      titel: 'Zeitstrahl',
+      inhalt: `
+        <p><strong>Gantt:</strong> Horizontale Tabelle mit gemeinsamer Datumsachse.
+        Schritte mit Start+Zieldatum als Balken, nur Zieldatum als Punkt.
+        Zoom-Schieberegler (1–7 Tage/Spalte).</p>
+        <p><strong>Timeline:</strong> Chronologische Liste nach Zieldatum sortiert.</p>
+        <p>Export: ⬇ SVG (Vektorgrafik) und 🖨 Drucken.</p>`,
+    },
+    {
+      titel: 'Prozess verwalten',
+      inhalt: `
+        <p>Eigener Tab für Verantwortliche. Immer bezogen auf den aktiven Prozess-Tab.</p>
+
+        <p><strong>Sichtbarkeit:</strong> 🌐 Öffentlich oder 🔒 Privat umschalten.</p>
+
+        <p><strong>Teilnehmer:</strong> Kürzel eingeben, Rolle wählen
+        (verantwortlich/mitarbeitend), hinzufügen. Nur Personen die unter
+        Admin → Zugriff freigegeben sind können zugewiesen werden.</p>
+
+        <p><strong>Schritte anpassen – Vorlage-Phasen:</strong><br>
+        Jede Vorlage-Phase hat einen editierbaren Kopf mit Farbwähler und Namensfeld.
+        Änderungen betreffen nur diesen Prozess. „↺ zurücksetzen" setzt Phase auf
+        Vorlage-Standard zurück.<br>
+        Pro Schritt: Titel umbenennen (Original bleibt als Hinweis sichtbar),
+        „✕ ausblenden" / „↩ reaktivieren".</p>
+
+        <p><strong>Schritte anpassen – Eigene Phasen:</strong><br>
+        Phasenname + Farbe eingeben, Schritte hinzufügen (Enter oder + Schritt),
+        „💾 Phase mit Schritten speichern". Bestehende eigene Phasen sind direkt
+        editierbar.</p>
+
+        <p><strong>Aktivitätsprotokoll:</strong> Letzte 200 Aktionen, CSV-Export.</p>`,
+    },
+    {
+      titel: 'Admin-Bereich',
+      inhalt: `
+        <p>Eigener Tab, vollständig unabhängig von Prozess-Tabs.</p>
+
+        <p><strong>Erscheinungsbild:</strong> Schulname, App-Titel, Primär-/Sekundärfarbe,
+        Logo (PNG/JPG/SVG, max. 500 KB). Workflow: anpassen → „👁 Vorschau" →
+        „⚡ Für alle aktivieren".</p>
+
+        <p><strong>Prozesse:</strong> Übersicht aller Prozesse. Neuen Prozess anlegen
+        mit Name, Sichtbarkeit und Basis (Vorlage, Snapshot oder Leer).</p>
+
+        <p><strong>Vorlagen-Snapshots:</strong> Tab-Leiste mit Standard + allen Snapshots.
+        Snapshots direkt bearbeiten – Phasen/Schritte hinzufügen, umbenennen, löschen.
+        Änderungen betreffen nur neue Prozesse, bestehende unberührt.</p>
+
+        <p><strong>Zugriff:</strong> Personen freigeben (Kürzel + App-Rolle).
+        Spalte „Zugewiesen in" zeigt farbige Badges welchen Prozessen jemand zugewiesen ist.</p>
+
+        <p><strong>Vorlage verwalten:</strong> Standard-Vorlagentabelle (globale Phasen/Schritte)
+        pflegen – betrifft neue Prozesse ohne Snapshot-Basis.</p>`,
+    },
+    {
+      titel: 'Rollen im Überblick',
+      inhalt: `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--line);">
+              <th style="text-align:left;padding:6px 8px;">Aktion</th>
+              <th style="padding:6px 8px;">Admin</th>
+              <th style="padding:6px 8px;">Verantwortlich</th>
+              <th style="padding:6px 8px;">Mitarbeitend</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[
+              ['Prozess anlegen',               '✓','–','–'],
+              ['Erscheinungsbild konfigurieren', '✓','–','–'],
+              ['Vorlagen verwalten',             '✓','–','–'],
+              ['Öffentlich/privat schalten',     '✓','✓ (eigener)','–'],
+              ['Teilnehmer verwalten',           '✓','✓ (eigener)','–'],
+              ['Phasennamen/-farben anpassen',   '✓','✓ (eigener)','–'],
+              ['Schritte umbenennen/ausblenden', '✓','✓ (eigener)','–'],
+              ['Eigene Phasen/Schritte anlegen', '✓','✓ (eigener)','–'],
+              ['Häkchen, Daten, Kommentare',     '✓','✓','✓'],
+            ].map(([a,b,c,d]) => `
+              <tr style="border-bottom:1px solid var(--line);">
+                <td style="padding:6px 8px;">${a}</td>
+                <td style="padding:6px 8px;text-align:center;">${b}</td>
+                <td style="padding:6px 8px;text-align:center;">${c}</td>
+                <td style="padding:6px 8px;text-align:center;">${d}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`,
+    },
+    {
+      titel: 'Datenschutz',
+      inhalt: `
+        <p>Die App speichert ausschließlich die zur Prozesskoordination nötigen Daten:
+        WebUntis-Kürzel und Anzeigenamen, Termine, Erledigungsstatus und Kommentare.</p>
+        <p>Es findet kein Tracking statt. Daten verlassen den Schulserver nicht und
+        werden nicht an Dritte weitergegeben.</p>`,
+    },
+  ];
+
+  kapitel.forEach((k) => {
+    const section = document.createElement('div');
+    section.className = 'handbuch-section';
+    section.innerHTML = `
+      <h3 class="handbuch-h3">${k.titel}</h3>
+      <div class="handbuch-inhalt">${k.inhalt}</div>`;
+    wrapper.appendChild(section);
+  });
+
+  return wrapper;
+}
+
 (async function start() {
   await ladePublicDashboard();
   await checkAuth();

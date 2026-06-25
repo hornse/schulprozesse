@@ -676,6 +676,25 @@ footer{
   .dash-grid{ grid-template-columns:1fr; }
 }
 
+/* Handbuch */
+.handbuch{ display:flex; flex-direction:column; gap:0; margin-top:16px; }
+.handbuch-section{
+  padding:18px 0; border-bottom:1px solid var(--line);
+}
+.handbuch-section:last-child{ border-bottom:none; }
+.handbuch-h3{
+  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+  margin:0 0 10px; color:var(--ink);
+}
+.handbuch-inhalt{
+  font-size:13.5px; line-height:1.65; color:var(--muted);
+}
+.handbuch-inhalt p{ margin:0 0 8px; }
+.handbuch-inhalt ul{ margin:4px 0 8px; padding-left:20px; }
+.handbuch-inhalt li{ margin-bottom:4px; }
+.handbuch-inhalt strong{ color:var(--ink); }
+.handbuch-inhalt table{ margin-top:8px; }
+
 /* ============================================================
    Print
    ============================================================ */

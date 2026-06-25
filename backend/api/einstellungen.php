@@ -365,19 +365,21 @@ function handleEinstellungenZuruecksetzen(PDO $db, array $config, array $input):
  */
 function handleDebugUpload(PDO $db, array $config, array $input): void
 {
+    // Alle empfangenen HTTP-Header ausgeben
+    $headers = [];
+    foreach ($_SERVER as $k => $v) {
+        if (str_starts_with($k, 'HTTP_')) {
+            $headers[str_replace('_', '-', substr($k, 5))] = $v;
+        }
+    }
     $info = [
-        'php_version'    => PHP_VERSION,
+        'method'         => $_SERVER['REQUEST_METHOD'],
+        'content_type'   => $_SERVER['CONTENT_TYPE'] ?? 'nicht gesetzt',
+        'headers'        => $headers,
+        'files_count'    => count($_FILES),
         'files'          => $_FILES,
         'post'           => $_POST,
-        'content_type'   => $_SERVER['CONTENT_TYPE'] ?? 'nicht gesetzt',
-        'method'         => $_SERVER['REQUEST_METHOD'],
-        'finfo'          => class_exists('finfo') ? 'verfügbar' : 'nicht verfügbar',
-        'upload_tmp_dir' => ini_get('upload_tmp_dir') ?: sys_get_temp_dir(),
-        'upload_max'     => ini_get('upload_max_filesize'),
-        'post_max'       => ini_get('post_max_size'),
-        'file_uploads'   => ini_get('file_uploads') ? 'ja' : 'nein',
-        'logo_dir_exists'=> is_dir(dirname(__DIR__, 2) . '/data/logos/') ? 'ja' : 'nein',
-        'logo_dir_write' => is_writable(dirname(__DIR__, 2) . '/data/logos/') ? 'ja' : 'nein',
+        'input_length'   => strlen(file_get_contents('php://input')),
     ];
     \App\Response::json($info);
 }

@@ -1602,14 +1602,30 @@ function renderInstanzSchrittVerwaltung() {
         async function speichereTitel() {
           const neuerTitel = titelFeld.value.trim();
           const gespeicherterTitel = neuerTitel || null;
-          await api(`/api/schritte/${s.id}`, {
-            method: 'PATCH', body: { instanz_titel: gespeicherterTitel }
-          });
-          // STATE direkt aktualisieren ohne Seitensprung
-          const gefunden = STATE.schritte.find((sc) => sc.id === s.id);
-          if (gefunden) gefunden.instanz_titel = gespeicherterTitel;
-          // Visuelles Feedback: Original-Hinweis aktualisieren
-          origSpan.textContent = gespeicherterTitel ? '← ' + origTitel : '';
+
+          if (s.quelle === 'eigen') {
+            // Eigener Schritt: titel direkt in instanz_schritte speichern
+            await api(`/api/instanz-schritte/${s.id}`, {
+              method: 'PATCH', body: { titel: neuerTitel || s.vorlage_titel }
+            });
+            const gefunden = STATE.schritte.find(
+              (sc) => sc.id === s.id && sc.quelle === 'eigen'
+            );
+            if (gefunden) { gefunden.titel = neuerTitel; gefunden.vorlage_titel = neuerTitel; }
+          } else {
+            // Vorlage-Schritt: instanz_titel in schritt_instanzen speichern
+            await api(`/api/schritte/${s.id}`, {
+              method: 'PATCH', body: { instanz_titel: gespeicherterTitel }
+            });
+            const gefunden = STATE.schritte.find(
+              (sc) => sc.id === s.id && sc.quelle !== 'eigen'
+            );
+            if (gefunden) gefunden.instanz_titel = gespeicherterTitel;
+          }
+
+          // Visuelles Feedback
+          origSpan.textContent = (s.quelle !== 'eigen' && gespeicherterTitel)
+            ? '← ' + origTitel : '';
           titelFeld.style.background = '#e8f5e9';
           setTimeout(() => { titelFeld.style.background = ''; }, 800);
         }

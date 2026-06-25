@@ -358,3 +358,26 @@ function handleEinstellungenZuruecksetzen(PDO $db, array $config, array $input):
 
     Response::json(['ok' => true]);
 }
+
+/**
+ * Temporärer Debug-Endpunkt – NUR für Diagnose, danach entfernen!
+ * GET https://prozesse.hornse.de/api/debug/upload
+ */
+function handleDebugUpload(PDO $db, array $config, array $input): void
+{
+    $info = [
+        'php_version'    => PHP_VERSION,
+        'files'          => $_FILES,
+        'post'           => $_POST,
+        'content_type'   => $_SERVER['CONTENT_TYPE'] ?? 'nicht gesetzt',
+        'method'         => $_SERVER['REQUEST_METHOD'],
+        'finfo'          => class_exists('finfo') ? 'verfügbar' : 'nicht verfügbar',
+        'upload_tmp_dir' => ini_get('upload_tmp_dir') ?: sys_get_temp_dir(),
+        'upload_max'     => ini_get('upload_max_filesize'),
+        'post_max'       => ini_get('post_max_size'),
+        'file_uploads'   => ini_get('file_uploads') ? 'ja' : 'nein',
+        'logo_dir_exists'=> is_dir(dirname(__DIR__, 2) . '/data/logos/') ? 'ja' : 'nein',
+        'logo_dir_write' => is_writable(dirname(__DIR__, 2) . '/data/logos/') ? 'ja' : 'nein',
+    ];
+    \App\Response::json($info);
+}

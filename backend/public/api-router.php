@@ -87,6 +87,7 @@ $routes = [
     ['DELETE', '#^api/einstellungen/logo$#',                             'handleLogoLoeschen'],
     ['POST',   '#^api/einstellungen/aktivieren$#',                       'handleEinstellungenAktivieren'],
     ['POST',   '#^api/einstellungen/zuruecksetzen$#',                    'handleEinstellungenZuruecksetzen'],
+    ['POST',   '#^api/debug/upload$#',                                   'handleDebugUpload'],
 ];
 
 foreach ($routes as [$routeMethod, $pattern, $handler]) {

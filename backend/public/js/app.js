@@ -455,10 +455,7 @@ function render() {
 }
 
 function renderShell() {
-  // Benutzer-Bereich oben rechts
-  const schulname = STATE.einstellungen?.schulname ?? 'Friedrich-Rückert-Gymnasium';
-  const appTitel  = STATE.einstellungen?.app_titel  ?? 'Schulprozesse';
-
+  // ---- Benutzer-Bereich oben rechts ----
   if (STATE.user) {
     $shellUser.innerHTML = '';
     const wrap = document.createElement('div');
@@ -481,70 +478,77 @@ function renderShell() {
     $shellUser.appendChild(btn);
   }
 
-  // Navigation
+  // ---- Navigation ----
   $shellNav.innerHTML = '';
 
-  const tabs = [
-    { id: 'dashboard',  label: 'Dashboard',  icon: '◎',  immer: true },
-    { id: 'checkliste', label: 'Checkliste', icon: '☑',  nurLogin: true },
-    { id: 'zeitstrahl', label: 'Zeitstrahl', icon: '◫',  immer: true },
-  ];
-
-  tabs.forEach((t) => {
-    if (t.nurLogin && !STATE.user) return;
+  // Hilfsfunktion: Nav-Tab anlegen
+  function navTab(id, icon, label) {
     const btn = document.createElement('button');
-    btn.className = 'nav-tab' + (STATE.ansicht === t.id ? ' aktiv' : '');
-    btn.innerHTML = `<span class="nav-icon">${t.icon}</span>${t.label}`;
-    btn.addEventListener('click', () => { STATE.ansicht = t.id; render(); });
+    btn.className = 'nav-tab' + (STATE.ansicht === id ? ' aktiv' : '');
+    btn.innerHTML = `<span class="nav-icon">${icon}</span>${label}`;
+    btn.addEventListener('click', () => { STATE.ansicht = id; render(); });
     $shellNav.appendChild(btn);
-  });
+  }
+  function navSep() {
+    const sep = document.createElement('div'); sep.className = 'nav-sep';
+    $shellNav.appendChild(sep);
+  }
 
-  // Trennlinie vor prozessspezifischen Tabs
-  if (STATE.user && STATE.prozessId) {
-    const kannVerwalten = STATE.user.rolle === 'admin' ||
-      STATE.teilnehmer.some((t) =>
-        t.webuntis_user === STATE.user.webuntis_user && t.rolle === 'verantwortlich'
-      );
+  // Immer sichtbare Tabs
+  navTab('dashboard',  '◎', 'Dashboard');
+  if (STATE.user) navTab('checkliste', '☑', 'Checkliste');
+  navTab('zeitstrahl', '◫', 'Zeitstrahl');
 
-    if (kannVerwalten) {
-      const sep = document.createElement('div'); sep.className = 'nav-sep';
-      $shellNav.appendChild(sep);
-      const btn = document.createElement('button');
-      btn.className = 'nav-tab' + (STATE.ansicht === 'prozess-verwalten' ? ' aktiv' : '');
-      btn.innerHTML = `<span class="nav-icon">⚙</span>Prozess verwalten`;
-      btn.addEventListener('click', () => { STATE.ansicht = 'prozess-verwalten'; render(); });
-      $shellNav.appendChild(btn);
+  // Prozess verwalten – nur wenn eingeloggt UND für mind. einen Prozess verantwortlich
+  // (Admins sind implizit verantwortlich für alle)
+  if (STATE.user) {
+    const verantwortlicheProzesse = STATE.prozesse.filter((p) =>
+      STATE.user.rolle === 'admin' || p.meine_rolle === 'verantwortlich'
+    );
+    if (verantwortlicheProzesse.length > 0) {
+      navSep();
+      navTab('prozess-verwalten', '⚙', 'Prozess verwalten');
     }
+  }
 
-    if (STATE.user.rolle === 'admin') {
-      const btn = document.createElement('button');
-      btn.className = 'nav-tab' + (STATE.ansicht === 'admin' ? ' aktiv' : '');
-      btn.innerHTML = `<span class="nav-icon">⚡</span>Admin`;
-      btn.addEventListener('click', () => { STATE.ansicht = 'admin'; render(); });
-      $shellNav.appendChild(btn);
-    }
+  // Admin – separater Tab, unabhängig von Prozess-Tabs
+  if (STATE.user?.rolle === 'admin') {
+    navTab('admin', '⚡', 'Admin');
   }
 
   // Hilfe – immer sichtbar, ganz rechts
-  const sepHilfe = document.createElement('div');
-  sepHilfe.className = 'nav-sep';
-  $shellNav.appendChild(sepHilfe);
-  const btnHilfe = document.createElement('button');
-  btnHilfe.className = 'nav-tab' + (STATE.ansicht === 'hilfe' ? ' aktiv' : '');
-  btnHilfe.innerHTML = `<span class="nav-icon">?</span>Hilfe`;
-  btnHilfe.addEventListener('click', () => { STATE.ansicht = 'hilfe'; render(); });
-  $shellNav.appendChild(btnHilfe);
+  navSep();
+  navTab('hilfe', '?', 'Hilfe');
 }
 
 function renderProzessLeiste() {
-  if (!STATE.user || STATE.prozesse.length === 0) {
+  // Prozess-Leiste nur bei prozessbezogenen Ansichten anzeigen
+  const prozessbezogen = ['dashboard', 'checkliste', 'zeitstrahl', 'prozess-verwalten'];
+  const zeigeLeiste = STATE.user &&
+    STATE.prozesse.length > 0 &&
+    prozessbezogen.includes(STATE.ansicht);
+
+  if (!zeigeLeiste) {
     $prozessLeiste.style.display = 'none';
     return;
   }
+
+  // Unter "Prozess verwalten": nur Prozesse für die man verantwortlich ist
+  const istProzessVerwalten = STATE.ansicht === 'prozess-verwalten';
+  const sichtbareProzesse = istProzessVerwalten
+    ? STATE.prozesse.filter((p) =>
+        STATE.user.rolle === 'admin' || p.meine_rolle === 'verantwortlich')
+    : STATE.prozesse;
+
+  if (sichtbareProzesse.length === 0) {
+    $prozessLeiste.style.display = 'none';
+    return;
+  }
+
   $prozessLeiste.style.display = 'flex';
   $prozessLeiste.innerHTML = '';
 
-  STATE.prozesse.forEach((p) => {
+  sichtbareProzesse.forEach((p) => {
     const tab = document.createElement('button');
     tab.className = 'prozess-tab' + (p.id === STATE.prozessId ? ' aktiv' : '');
     const schloss = p.oeffentlich ? '' : ' 🔒';
@@ -558,7 +562,8 @@ function renderProzessLeiste() {
   });
 }
 
-// renderProzessVerwaltungSeite – eigene Seite statt Block am Ende
+// renderProzessVerwaltungSeite – Teilnehmer und Sichtbarkeit
+// Vorlagen-Verwaltung kommt in Schritt 2 als eigenes prozessspezifisches Konzept
 function renderProzessVerwaltungSeite() {
   const container = document.createElement('div');
   container.innerHTML = `<div class="page-header">
@@ -566,14 +571,6 @@ function renderProzessVerwaltungSeite() {
     <span class="page-subtitle">${STATE.aktiverProzess?.label ?? ''}</span>
   </div>`;
   container.appendChild(renderProzessVerwaltungInhalt());
-
-  // Verantwortliche können auch Phasen und Schritte ihres Prozesses verwalten
-  const vorlagenSection = document.createElement('div');
-  vorlagenSection.className = 'admin-section';
-  vorlagenSection.style.marginTop = '24px';
-  vorlagenSection.appendChild(renderVorlagenVerwaltung());
-  container.appendChild(vorlagenSection);
-
   return container;
 }
 

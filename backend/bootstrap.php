@@ -61,11 +61,8 @@ Session::start($config);
 $method = $_SERVER['REQUEST_METHOD'];
 $route  = trim((string) ($_GET['route'] ?? ''), '/');
 if (in_array($method, ['POST', 'PATCH', 'PUT', 'DELETE'], true)) {
-    // Debug-Endpunkt vom CSRF-Check ausnehmen
-    if ($route !== 'api/debug/upload') {
-        $marker = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
-        if ($marker !== 'SchuljahreswechselApp') {
-            \App\Response::error('Fehlender oder ungültiger Anfrage-Header.', 403);
-        }
+    $marker = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+    if ($marker !== 'SchuljahreswechselApp') {
+        \App\Response::error('Fehlender oder ungültiger Anfrage-Header.', 403);
     }
 }

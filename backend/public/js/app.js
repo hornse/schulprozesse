@@ -1515,88 +1515,105 @@ function renderInstanzSchrittVerwaltung() {
   // Neue Phase + Schritte anlegen
   const neuePhaseBlock = document.createElement('div');
   neuePhaseBlock.className = 'neue-instanz-phase-form';
-
-  let neueInstanzFarbe = '#7F8C8D';
-  const farbwahlInstanz = renderFarbwahl(neueInstanzFarbe, (f) => { neueInstanzFarbe = f; });
+  block.appendChild(neuePhaseBlock); // zuerst in DOM einhängen
 
   neuePhaseBlock.innerHTML = `
     <h5 style="font-size:12px;font-weight:600;margin:0 0 8px;color:var(--muted);">
       Neue Phase anlegen
-    </h5>`;
-  const phaseReihe = document.createElement('div');
-  phaseReihe.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
-  const phaseInput = document.createElement('input');
-  phaseInput.type = 'text'; phaseInput.placeholder = 'Phasenname, z. B. Nachbereitung';
-  phaseInput.style.cssText = 'flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;';
-  phaseReihe.appendChild(phaseInput);
-  neuePhaseBlock.appendChild(phaseReihe);
+    </h5>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <input type="text" id="neue-phase-name" placeholder="Phasenname, z. B. Nachbereitung"
+             style="flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;">
+    </div>`;
+
+  // Farbwahl
+  let neueInstanzFarbe = '#7F8C8D';
+  const farbwahlInstanz = renderFarbwahl(neueInstanzFarbe, (f) => { neueInstanzFarbe = f; });
   neuePhaseBlock.appendChild(farbwahlInstanz);
 
-  // Schritt-Liste für die neue Phase
-  let neueSchritte = [];
+  // Schritt-Liste
+  const neueSchritte = [];
   const schrittContainer = document.createElement('div');
   schrittContainer.style.marginTop = '10px';
   schrittContainer.className = 'instanz-schritte-liste';
+  neuePhaseBlock.appendChild(schrittContainer);
 
-  function schrittZeileNeu(titel, idx) {
-    const z = document.createElement('div');
-    z.className = 'instanz-schritt-zeile';
-    z.innerHTML = `
-      <span style="font-size:13px;flex:1;">${titel}</span>
-      <button class="btn-sekundaer btn btn-gefahr"
-              style="width:auto;font-size:11px;padding:3px 8px;">✕</button>`;
-    z.querySelector('button').addEventListener('click', () => {
-      neueSchritte.splice(idx, 1);
-      schrittContainer.innerHTML = '';
-      neueSchritte.forEach((t, i) => schrittContainer.appendChild(schrittZeileNeu(t, i)));
+  function aktualisiereSchrittListe() {
+    schrittContainer.innerHTML = '';
+    neueSchritte.forEach((titel, idx) => {
+      const z = document.createElement('div');
+      z.className = 'instanz-schritt-zeile';
+      z.innerHTML = `
+        <span style="font-size:13px;flex:1;">${titel}</span>
+        <button class="btn-sekundaer btn btn-gefahr"
+                style="width:auto;font-size:11px;padding:3px 8px;">✕</button>`;
+      z.querySelector('button').addEventListener('click', () => {
+        neueSchritte.splice(idx, 1);
+        aktualisiereSchrittListe();
+      });
+      schrittContainer.appendChild(z);
     });
-    return z;
   }
 
-  const neuerSchrittForm = document.createElement('form');
-  neuerSchrittForm.className = 'inline-form';
-  neuerSchrittForm.style.marginTop = '8px';
-  neuerSchrittForm.innerHTML = `
-    <input type="text" id="neuer-instanz-schritt" placeholder="Schritt hinzufügen..."
-           style="flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;">
-    <button class="btn-sekundaer btn" type="submit" style="width:auto;">+ Schritt</button>`;
-  neuerSchrittForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const titel = neuerSchrittForm.querySelector('#neuer-instanz-schritt').value.trim();
+  // Schritt hinzufügen
+  const addSchrittReihe = document.createElement('div');
+  addSchrittReihe.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
+  const schrittInput = document.createElement('input');
+  schrittInput.type = 'text';
+  schrittInput.placeholder = 'Schritt hinzufügen...';
+  schrittInput.style.cssText = 'flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;';
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn-sekundaer btn';
+  addBtn.style.cssText = 'width:auto;';
+  addBtn.textContent = '+ Schritt';
+  addBtn.addEventListener('click', () => {
+    const titel = schrittInput.value.trim();
     if (!titel) return;
     neueSchritte.push(titel);
-    schrittContainer.innerHTML = '';
-    neueSchritte.forEach((t, i) => schrittContainer.appendChild(schrittZeileNeu(t, i)));
-    neuerSchrittForm.querySelector('#neuer-instanz-schritt').value = '';
+    aktualisiereSchrittListe();
+    schrittInput.value = '';
+    schrittInput.focus();
   });
+  // Enter im Schritt-Input
+  schrittInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
+  });
+  addSchrittReihe.appendChild(schrittInput);
+  addSchrittReihe.appendChild(addBtn);
+  neuePhaseBlock.appendChild(addSchrittReihe);
 
+  // Speichern-Button
   const speichernBtn = document.createElement('button');
+  speichernBtn.type = 'button';
   speichernBtn.className = 'btn';
-  speichernBtn.style.cssText = 'width:auto;margin-top:12px;';
-  speichernBtn.textContent = 'Phase mit Schritten speichern';
+  speichernBtn.style.cssText = 'width:auto;margin-top:14px;';
+  speichernBtn.textContent = '💾 Phase mit Schritten speichern';
   speichernBtn.addEventListener('click', async () => {
-    const phaseName = phaseInput.value.trim();
+    const phaseName = neuePhaseBlock.querySelector('#neue-phase-name').value.trim();
     if (!phaseName) { alert('Bitte einen Phasennamen eingeben.'); return; }
     if (neueSchritte.length === 0) { alert('Bitte mindestens einen Schritt hinzufügen.'); return; }
 
-    // Alle Schritte dieser Phase anlegen
-    for (const titel of neueSchritte) {
-      await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
-        method: 'POST',
-        body: { titel, phase_name: phaseName, phase_farbe: neueInstanzFarbe }
-      });
+    speichernBtn.disabled = true;
+    speichernBtn.textContent = 'Wird gespeichert…';
+    try {
+      for (const titel of neueSchritte) {
+        await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
+          method: 'POST',
+          body: { titel, phase_name: phaseName, phase_farbe: neueInstanzFarbe },
+        });
+      }
+      const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+      STATE.schritte = res.schritte;
+      block.replaceWith(renderInstanzSchrittVerwaltung());
+    } catch (err) {
+      alert('Fehler beim Speichern: ' + err.message);
+      speichernBtn.disabled = false;
+      speichernBtn.textContent = '💾 Phase mit Schritten speichern';
     }
-
-    // Schritte neu laden
-    const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-    STATE.schritte = res.schritte;
-    block.replaceWith(renderInstanzSchrittVerwaltung());
   });
-
-  neuePhaseBlock.appendChild(schrittContainer);
-  neuePhaseBlock.appendChild(neuerSchrittForm);
   neuePhaseBlock.appendChild(speichernBtn);
-  block.appendChild(neuePhaseBlock);
+
   return block;
 }
 

@@ -451,7 +451,26 @@ function render() {
   } else if (STATE.ansicht === 'zeitstrahl') {
     $app.appendChild(renderZeitstrahl());
   } else if (STATE.ansicht === 'prozess-verwalten' && STATE.user) {
-    $app.appendChild(renderProzessVerwaltungSeite());
+    // Sicherstellen dass der aktive Prozess einer ist für den man verantwortlich ist
+    const verantwortlicheProzesse = STATE.prozesse.filter((p) =>
+      STATE.user.rolle === 'admin' || p.meine_rolle === 'verantwortlich'
+    );
+    if (verantwortlicheProzesse.length === 0) {
+      // Kein Prozess mit Verantwortung – Tab sollte nicht sichtbar sein
+      STATE.ansicht = 'dashboard';
+      $app.appendChild(renderDashboard());
+    } else {
+      // Falls aktiver Prozess kein verantwortlicher ist → zum ersten wechseln
+      const aktivIstVerantwortlich = verantwortlicheProzesse.some(
+        (p) => p.id === STATE.prozessId
+      );
+      if (!aktivIstVerantwortlich) {
+        // Async-Wechsel nötig – direkt rendern mit erstem verantwortlichen Prozess
+        waehleProzess(verantwortlicheProzesse[0].id);
+        return; // render() wird von waehleProzess aufgerufen
+      }
+      $app.appendChild(renderProzessVerwaltungSeite());
+    }
   } else if (STATE.ansicht === 'admin' && STATE.user?.rolle === 'admin') {
     $app.appendChild(renderAdminSeite());
   } else if (STATE.ansicht === 'hilfe') {
@@ -1443,10 +1462,9 @@ function renderInstanzSchrittVerwaltung() {
         const farbPopup = document.createElement('div');
         farbPopup.className = 'farb-popup';
         farbPopup.style.display = 'none';
-        // phase_id aus STATE.schritte holen falls im Verwaltungs-Response nicht vorhanden
-        const phaseIdFallback = STATE.schritte.find(
-          (sc) => sc.phase === s.phase
-        )?.phase_id ?? s.phase_id;
+        // phase_id direkt aus dem Schritt nehmen (kommt aus dem JOIN auf phasen)
+        const phaseIdFallback = s.phase_id
+          ?? STATE.schritte.find((sc) => sc.phase === s.phase)?.phase_id;
 
         farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
           aktFarbe = f;

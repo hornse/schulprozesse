@@ -7,6 +7,24 @@
 
 declare(strict_types=1);
 
+// Globaler Fehler-Handler – stellt sicher dass PHP-Fehler immer als JSON ankommen
+set_exception_handler(function (Throwable $e) {
+    while (ob_get_level() > 0) ob_end_clean();
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'error' => 'Interner Serverfehler',
+        'detail' => $e->getMessage(),
+        'file'   => basename($e->getFile()) . ':' . $e->getLine(),
+    ]);
+    exit;
+});
+
+set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline) {
+    if (!(error_reporting() & $errno)) return false;
+    throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
+
 require __DIR__ . '/../bootstrap.php';
 
 use App\Response;

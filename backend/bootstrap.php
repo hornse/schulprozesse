@@ -1,6 +1,6 @@
 <?php
 /*
- * Schuljahreswechsel WebUntis
+ * Schulprozesse – prozesse.hornse.de
  * Copyright (C) 2026 Sebastian Horn, Friedrich-Rückert-Gymnasium Düsseldorf
  *
  * This program is free software: you can redistribute it and/or modify

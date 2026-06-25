@@ -73,6 +73,16 @@ unberührt.
 
 ### Behoben
 
+- **Logo-Upload** – Umstellung auf Base64-JSON statt Multipart (Apache
+  `LimitRequestBody` blockierte Multipart-Uploads)
+- **Deployment auf Uberspace** – App läuft jetzt über PHP built-in server
+  (supervisord, Port 8083) statt direkt über Apache; löst Rewrite-Probleme
+- **Migration 003** (`einstellungen`-Tabelle) war in Installations-Doku
+  nicht vollständig dokumentiert
+- Globaler Exception-Handler in `api-router.php` – PHP-Fehler kommen
+  immer als JSON zurück statt als Apache-HTML-Fehlerseite
+- Prozess-Tabs unter „Prozess verwalten" – nur noch verantwortliche
+  Prozesse sichtbar; falscher Prozess bei Mitgliedern behoben
 - Prozess-Tabs wechselten Ansicht nicht (Query-Parameter-Bug im Router)
 - `aktiv`-Flag aus Prozess-Logik entfernt; alle zugewiesenen Prozesse
   gleichzeitig nutzbar

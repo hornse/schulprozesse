@@ -1,7 +1,20 @@
 RewriteEngine On
+
+# Auf Uberspace läuft die App über einen PHP built-in server (supervisord,
+# Port 8083) der mit dev-router.php als Router-Script gestartet wird.
+# Diese .htaccess ist daher nur noch als Fallback aktiv wenn die App
+# ausnahmsweise direkt über Apache ausgeliefert wird (z. B. lokal).
+#
+# Im Normalbetrieb (Uberspace) übernimmt dev-router.php das Routing –
+# .htaccess und mod_rewrite werden dann nicht ausgewertet.
 RewriteBase /
+
+# Nur /api/... an den PHP-Router weiterleiten. Alles andere
+# (index.html, css/, js/) ist statisches Frontend.
 RewriteRule ^api/(.*)$ api-router.php?route=api/$1 [QSA,L]
 
+# SQLite-Datei liegt außerhalb des Webroots – diese Regel ist ein
+# zusätzliches Sicherheitsnetz falls das versehentlich geändert wird.
 <FilesMatch "\.sqlite$">
     Require all denied
 </FilesMatch>

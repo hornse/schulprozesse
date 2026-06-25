@@ -365,21 +365,64 @@ function handleEinstellungenZuruecksetzen(PDO $db, array $config, array $input):
  */
 function handleDebugUpload(PDO $db, array $config, array $input): void
 {
-    // Alle empfangenen HTTP-Header ausgeben
-    $headers = [];
-    foreach ($_SERVER as $k => $v) {
-        if (str_starts_with($k, 'HTTP_')) {
-            $headers[str_replace('_', '-', substr($k, 5))] = $v;
-        }
+    // Simuliere handleLogoUpload Schritt für Schritt und gib Fehlerort zurück
+    $log = [];
+
+    // Schritt 1: FILES prüfen
+    $log[] = 'files_count: ' . count($_FILES);
+    if (empty($_FILES['logo'])) {
+        \App\Response::json(['fehler' => 'FILES[logo] leer', 'log' => $log]);
     }
-    $info = [
-        'method'         => $_SERVER['REQUEST_METHOD'],
-        'content_type'   => $_SERVER['CONTENT_TYPE'] ?? 'nicht gesetzt',
-        'headers'        => $headers,
-        'files_count'    => count($_FILES),
-        'files'          => $_FILES,
-        'post'           => $_POST,
-        'input_length'   => strlen(file_get_contents('php://input')),
-    ];
-    \App\Response::json($info);
+
+    $datei = $_FILES['logo'];
+    $log[] = 'datei.error: ' . $datei['error'];
+    $log[] = 'datei.size: ' . $datei['size'];
+    $log[] = 'datei.tmp_name: ' . $datei['tmp_name'];
+    $log[] = 'tmp_exists: ' . (file_exists($datei['tmp_name']) ? 'ja' : 'nein');
+
+    if ($datei['error'] !== UPLOAD_ERR_OK) {
+        \App\Response::json(['fehler' => 'Upload-Fehler: ' . $datei['error'], 'log' => $log]);
+    }
+
+    // Schritt 2: Größe
+    if ($datei['size'] > 500 * 1024) {
+        \App\Response::json(['fehler' => 'zu groß', 'log' => $log]);
+    }
+    $log[] = 'groesse: OK';
+
+    // Schritt 3: MIME
+    $finfo    = new finfo(FILEINFO_MIME_TYPE);
+    $mimeType = $finfo->file($datei['tmp_name']);
+    $log[] = 'mime: ' . $mimeType;
+
+    $erlaubt = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/svg+xml' => 'svg'];
+    if (!array_key_exists($mimeType, $erlaubt)) {
+        \App\Response::json(['fehler' => 'MIME nicht erlaubt: ' . $mimeType, 'log' => $log]);
+    }
+    $log[] = 'mime: OK';
+
+    // Schritt 4: Zielverzeichnis
+    $logoDir = dirname(__DIR__, 2) . '/data/logos/';
+    $log[] = 'logoDir: ' . $logoDir;
+    $log[] = 'dir_exists: ' . (is_dir($logoDir) ? 'ja' : 'nein');
+    $log[] = 'dir_write: ' . (is_writable($logoDir) ? 'ja' : 'nein');
+
+    // Schritt 5: Testdatei schreiben
+    $ext      = $erlaubt[$mimeType];
+    $testName = bin2hex(random_bytes(8)) . '_TEST.' . $ext;
+    $zielPfad = $logoDir . $testName;
+    $log[] = 'zielPfad: ' . $zielPfad;
+
+    $kopiert = copy($datei['tmp_name'], $zielPfad);
+    $log[] = 'copy: ' . ($kopiert ? 'OK' : 'FEHLER');
+
+    if ($kopiert) {
+        unlink($zielPfad);
+        $log[] = 'testdatei wieder gelöscht';
+    }
+
+    // Schritt 6: move_uploaded_file simulieren
+    $log[] = 'is_uploaded_file: ' . (is_uploaded_file($datei['tmp_name']) ? 'ja' : 'nein');
+
+    \App\Response::json(['ok' => true, 'log' => $log]);
 }

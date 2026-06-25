@@ -1443,16 +1443,23 @@ function renderInstanzSchrittVerwaltung() {
         const farbPopup = document.createElement('div');
         farbPopup.className = 'farb-popup';
         farbPopup.style.display = 'none';
+        // phase_id aus STATE.schritte holen falls im Verwaltungs-Response nicht vorhanden
+        const phaseIdFallback = STATE.schritte.find(
+          (sc) => sc.phase === s.phase
+        )?.phase_id ?? s.phase_id;
+
         farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
           aktFarbe = f;
           farbBtn.style.background = f;
           phaseBlock.style.setProperty('--phase-farbe', f);
+          if (!phaseIdFallback) { alert('phase_id fehlt – bitte Seite neu laden.'); return; }
           await api(
-            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${s.phase_id}`,
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
             { method: 'POST', body: { instanz_farbe: f } }
           );
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
+          render(); // Alle Ansichten aktualisieren
         }));
         farbBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
@@ -1472,12 +1479,14 @@ function renderInstanzSchrittVerwaltung() {
         nameInput.addEventListener('change', async () => {
           const neuerName = nameInput.value.trim();
           if (!neuerName) return;
+          if (!phaseIdFallback) { alert('phase_id fehlt – bitte Seite neu laden.'); return; }
           await api(
-            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${s.phase_id}`,
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
             { method: 'POST', body: { instanz_name: neuerName } }
           );
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
+          render(); // Alle Ansichten aktualisieren
         });
 
         // Zurücksetzen-Button
@@ -1488,8 +1497,9 @@ function renderInstanzSchrittVerwaltung() {
         resetBtn.textContent = '↺ zurücksetzen';
         resetBtn.title = 'Auf Vorlage zurücksetzen';
         resetBtn.addEventListener('click', async () => {
+          if (!phaseIdFallback) { alert('phase_id fehlt – bitte Seite neu laden.'); return; }
           await api(
-            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${s.phase_id}`,
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
             { method: 'DELETE' }
           );
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
@@ -1779,11 +1789,7 @@ function renderInstanzSchrittVerwaltung() {
 
 async function ladeProzessSchritteMitDeaktivierten(prozessId) {
   try {
-    const res = await fetch(
-      `/api/schritte?prozess_id=${prozessId}&alle=1`,
-      { headers: { 'X-Requested-With': 'SchuljahreswechselApp' }, credentials: 'same-origin' }
-    );
-    const data = await res.json();
+    const data = await api(`/api/schritte?prozess_id=${prozessId}&alle=1`);
     return data.schritte ?? [];
   } catch { return []; }
 }

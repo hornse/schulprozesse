@@ -1462,22 +1462,35 @@ function renderInstanzSchrittVerwaltung() {
         const farbPopup = document.createElement('div');
         farbPopup.className = 'farb-popup';
         farbPopup.style.display = 'none';
-        // phase_id direkt aus dem Schritt nehmen (kommt aus dem JOIN auf phasen)
+        // phase_id direkt aus dem Schritt nehmen (nur bei Vorlage-Schritten vorhanden)
         const phaseIdFallback = s.phase_id
-          ?? STATE.schritte.find((sc) => sc.phase === s.phase)?.phase_id;
+          ?? STATE.schritte.find((sc) => sc.phase === s.phase && sc.phase_id)?.phase_id;
+        const istEigenPhase = !phaseIdFallback; // Eigene Phasen haben keine phase_id
 
         farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
           aktFarbe = f;
           farbBtn.style.background = f;
           phaseBlock.style.setProperty('--phase-farbe', f);
-          if (!phaseIdFallback) { alert('phase_id fehlt – bitte Seite neu laden.'); return; }
-          await api(
-            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
-            { method: 'POST', body: { instanz_farbe: f } }
-          );
+          if (istEigenPhase) {
+            // Eigene Phase: Farbe aller Schritte dieser Phase aktualisieren
+            const schritteDieserPhase = alle.filter(
+              (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
+            );
+            for (const sc of schritteDieserPhase) {
+              await api(`/api/instanz-schritte/${sc.id}`, {
+                method: 'PATCH', body: { phase_farbe: f }
+              });
+            }
+          } else {
+            // Vorlage-Phase: instanz_phasen API
+            await api(
+              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+              { method: 'POST', body: { instanz_farbe: f } }
+            );
+          }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          render(); // Alle Ansichten aktualisieren
+          render();
         }));
         farbBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
@@ -1497,29 +1510,51 @@ function renderInstanzSchrittVerwaltung() {
         nameInput.addEventListener('change', async () => {
           const neuerName = nameInput.value.trim();
           if (!neuerName) return;
-          if (!phaseIdFallback) { alert('phase_id fehlt – bitte Seite neu laden.'); return; }
-          await api(
-            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
-            { method: 'POST', body: { instanz_name: neuerName } }
-          );
+          if (istEigenPhase) {
+            // Eigene Phase: phase_name aller Schritte dieser Phase aktualisieren
+            const schritteDieserPhase = alle.filter(
+              (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
+            );
+            for (const sc of schritteDieserPhase) {
+              await api(`/api/instanz-schritte/${sc.id}`, {
+                method: 'PATCH', body: { phase_name: neuerName }
+              });
+            }
+          } else {
+            await api(
+              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+              { method: 'POST', body: { instanz_name: neuerName } }
+            );
+          }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          render(); // Alle Ansichten aktualisieren
+          render();
         });
 
-        // Zurücksetzen-Button
+        // Zurücksetzen-Button (nur für Vorlage-Phasen sinnvoll)
         const resetBtn = document.createElement('button');
         resetBtn.type = 'button';
         resetBtn.className = 'btn-sekundaer btn';
         resetBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;margin-left:auto;flex-shrink:0;';
-        resetBtn.textContent = '↺ zurücksetzen';
-        resetBtn.title = 'Auf Vorlage zurücksetzen';
+        resetBtn.textContent = istEigenPhase ? '✕ Phase löschen' : '↺ zurücksetzen';
+        resetBtn.title = istEigenPhase
+          ? 'Alle Schritte dieser Phase löschen'
+          : 'Auf Vorlage-Standard zurücksetzen';
         resetBtn.addEventListener('click', async () => {
-          if (!phaseIdFallback) { alert('phase_id fehlt – bitte Seite neu laden.'); return; }
-          await api(
-            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
-            { method: 'DELETE' }
-          );
+          if (istEigenPhase) {
+            const schritteDieserPhase = alle.filter(
+              (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
+            );
+            if (!confirm(`Phase „${s.phase}" und ${schritteDieserPhase.length} Schritt(e) löschen?`)) return;
+            for (const sc of schritteDieserPhase) {
+              await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
+            }
+          } else {
+            await api(
+              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+              { method: 'DELETE' }
+            );
+          }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
           block.replaceWith(renderInstanzSchrittVerwaltung());

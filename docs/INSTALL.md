@@ -4,23 +4,16 @@
 
 ## Teil 1: Lokales Projekt in IntelliJ und GitHub anlegen
 
-### Schritt 1 – ZIP entpacken und Verzeichnis vorbereiten
+### Schritt 1 – ZIP entpacken
 
-Das heruntergeladene ZIP enthält einen Ordner `schulprozesse/`. Diesen in
-ein sinnvolles Verzeichnis auf dem Rechner entpacken, z. B.:
-
-```
-~/Projekte/schulprozesse/
-```
+Ordner `schulprozesse/` in ein sinnvolles Verzeichnis entpacken,
+z. B. `~/Projekte/schulprozesse/`.
 
 ### Schritt 2 – IntelliJ öffnen
 
-1. IntelliJ IDEA starten
-2. „Open" klicken und den entpackten Ordner `schulprozesse/` auswählen
+„Open" → entpackten Ordner auswählen.
 
 ### Schritt 3 – Git initialisieren
-
-Im Terminal unten in IntelliJ:
 
 ```bash
 git init
@@ -30,13 +23,11 @@ git commit -m "Initial commit: Schulprozesse"
 
 ### Schritt 4 – GitHub-Repository anlegen
 
-1. github.com → „New repository"
-2. Name: `schulprozesse`, Sichtbarkeit wählen
-3. Kein README, .gitignore oder Lizenz hinzufügen
-4. „Create repository" klicken
-5. Remote-URL notieren (z. B. `https://github.com/hornse/schulprozesse.git`)
+1. github.com → „New repository" → Name: `schulprozesse`
+2. Kein README/gitignore/Lizenz hinzufügen
+3. Remote-URL notieren
 
-### Schritt 5 – Remote hinzufügen und pushen
+### Schritt 5 – Remote und Push
 
 ```bash
 git remote add github https://github.com/hornse/schulprozesse.git
@@ -45,14 +36,13 @@ git push -u github main
 
 ---
 
-## Teil 2: Uberspace einrichten (prozesse.hornse.de)
+## Teil 2: Uberspace einrichten
 
-### Schritt 6 – Bare repo auf Uberspace anlegen
+### Schritt 6 – Bare repo
 
 ```bash
 mkdir -p ~/repos/schulprozesse.git
-cd ~/repos/schulprozesse.git
-git init --bare
+cd ~/repos/schulprozesse.git && git init --bare
 
 cat > hooks/post-receive << 'EOF'
 #!/bin/bash
@@ -63,13 +53,13 @@ EOF
 chmod +x hooks/post-receive
 ```
 
-### Schritt 7 – Zweiten Remote lokal hinzufügen
+### Schritt 7 – Zweiten Remote lokal
 
 ```bash
 git remote add uberspace hornse@halimede.uberspace.de:repos/schulprozesse.git
 ```
 
-Deployen ab jetzt mit:
+Deployen ab jetzt:
 ```bash
 git push github main && git push uberspace main
 ```
@@ -78,14 +68,11 @@ git push github main && git push uberspace main
 
 ```bash
 uberspace web domain add prozesse.hornse.de
-
 cd /var/www/virtual/hornse
 ln -s schulprozesse-src/backend/public prozesse.hornse.de
 ```
 
-Der Symlink muss Geschwister von `html/` sein, nicht darin.
-
-### Schritt 9 – Konfiguration anlegen
+### Schritt 9 – Konfiguration
 
 ```bash
 cd /var/www/virtual/hornse/schulprozesse-src
@@ -94,12 +81,11 @@ nano config/config.php
 ```
 
 Mindestens setzen:
-
 ```php
 'webuntis' => [
     'base_url' => 'https://SERVERNAME.webuntis.com',
     'school'   => 'SCHULKENNUNG',
-    'allowed_person_types' => [2, 16],  // 2 = Lehrkraft, 16 = WebUntis-Admin
+    'allowed_person_types' => [2, 16],
 ],
 ```
 
@@ -111,6 +97,7 @@ mkdir -p data
 sqlite3 data/app.sqlite < migrations/001_init.sql
 sqlite3 data/app.sqlite < migrations/002_seed_schritte.sql
 sqlite3 data/app.sqlite < migrations/003_einstellungen.sql
+sqlite3 data/app.sqlite < migrations/004_instanz_anpassungen.sql
 ```
 
 ### Schritt 11 – Ersten Admin eintragen
@@ -125,38 +112,28 @@ sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
    VALUES (1, 'DEIN_KUERZEL', 'verantwortlich');"
 ```
 
-Dann `https://prozesse.hornse.de` aufrufen und einloggen.
-
 ---
 
-## Optionale Prozess-Vorlagen einspielen
+## Optionale Vorlagen
 
 ```bash
-sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
-  < /var/www/virtual/hornse/schulprozesse-src/migrations/seed_vorlagen_snapshots.sql
+sqlite3 data/app.sqlite < migrations/seed_vorlagen_snapshots.sql
 ```
 
-Legt 6 fertige Snapshots an, die sofort im Dropdown „Basis wählen" erscheinen.
-Die aktive Vorlagentabelle wird dabei nicht verändert.
+6 fertige Snapshots: Schuljahresbeginn, Schuljahresabschluss,
+Abitur-Organisation, iPad-/Geräteausgabe, DSGVO-Jahresprüfung,
+Studientag-Organisation.
 
 ---
 
-## Lokales Notfall-Passwort (optional)
-
-Unabhängiger lokaler Benutzer der auch ohne WebUntis funktioniert:
+## Notfall-Passwort (optional)
 
 ```bash
-# Hash generieren
-php -r "echo password_hash('SICHERES_PASSWORT', PASSWORD_BCRYPT) . PHP_EOL;"
+php -r "echo password_hash('PASSWORT', PASSWORD_BCRYPT) . PHP_EOL;"
 
-# Lokalen Benutzer anlegen
-sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
+sqlite3 data/app.sqlite \
   "INSERT INTO benutzer_rollen (webuntis_user, anzeigename, rolle, passwort_hash)
-   VALUES ('notfalladmin', 'Notfall Admin', 'admin', 'HASH_VON_OBEN');"
-
-sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
-  "INSERT INTO prozess_teilnehmer (prozess_id, webuntis_user, rolle)
-   VALUES (1, 'notfalladmin', 'verantwortlich');"
+   VALUES ('notfalladmin', 'Notfall Admin', 'admin', 'HASH');"
 ```
 
 ---
@@ -164,20 +141,18 @@ sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
 ## Laufender Betrieb
 
 ```bash
-git add -A
-git commit -m "Beschreibung"
+git add -A && git commit -m "Beschreibung"
 git push github main && git push uberspace main
 ```
 
-Kein Migrationsschritt nötig – das Schema ist vollständig in `001_init.sql`.
-
 ---
 
-## Migrationen im Überblick
+## Migrationen
 
 | Datei | Inhalt |
 |---|---|
 | `001_init.sql` | Vollständiges Schema |
 | `002_seed_schritte.sql` | 13 WebUntis-Schritte + erster Prozess |
-| `003_einstellungen.sql` | Erscheinungsbild-Einstellungen mit Standardwerten |
+| `003_einstellungen.sql` | Erscheinungsbild-Einstellungen |
+| `004_instanz_anpassungen.sql` | Instanz-Anpassungen (Phasen, eigene Schritte) |
 | `seed_vorlagen_snapshots.sql` | 6 fertige Prozess-Vorlagen als Snapshots |

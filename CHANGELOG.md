@@ -12,6 +12,74 @@ Geplant:
 - Schritte duplizieren
 - Archiv-Ansicht für abgeschlossene Prozesse
 - E-Mail-Erinnerungen bei überfälligen Schritten
+- Alles-zurücksetzen für Prozess-Instanz-Anpassungen
+
+---
+
+## [2.0.0] – 2026-06-25
+
+### Neu: Prozess-Instanz-Anpassungen (Kernfeature)
+
+Das wichtigste neue Konzept: Prozesse sind jetzt vollständige Instanzen
+ihrer Vorlage (analog zu Objekt/Klasse in der OOP). Alle Anpassungen
+betreffen nur den konkreten Prozess – Vorlage und andere Prozesse bleiben
+unberührt.
+
+- **Phasennamen und -farben prozessspezifisch** – unter „Prozess verwalten →
+  Schritte anpassen" können Phasennamen und -farben für jeden Prozess
+  individuell überschrieben werden; Zurücksetzen auf Vorlage jederzeit möglich
+- **Schritte umbenennen** – jeder Schritt kann für diesen Prozess umbenannt
+  werden; Original-Name bleibt als Hinweis sichtbar
+- **Schritte deaktivieren** – nicht benötigte Schritte ausblenden und
+  jederzeit reaktivieren ohne sie zu löschen
+- **Eigene Phasen und Schritte** – neue Phasen mit eigener Farbe und
+  beliebig vielen Schritten anlegen, die nur in diesem Prozess erscheinen
+- **Neue Migrationen** `004_instanz_anpassungen.sql` mit Tabellen
+  `instanz_phasen`, `instanz_schritte` (+ neue Felder in `schritt_instanzen`)
+
+### Neu: Admin-Struktur überarbeitet
+
+- **Admin-Tab** vollständig eigenständig – keine Prozess-Tabs mehr,
+  kein Zusammenhang mit einzelnen Checklisten
+- **Prozess verwalten** nur sichtbar wenn man für mindestens einen Prozess
+  verantwortlich ist; Prozess-Tabs zeigen nur verantwortliche Prozesse
+- **Aktivitätsprotokoll** zu „Prozess verwalten" verschoben statt im Admin
+- **Hilfe-Tab** hat keine Prozess-Tabs mehr
+
+### Neu: Vorlagenverwaltung mit Snapshot-Auswahl
+
+- Vorlagenverwaltung im Admin hat Tab-Leiste: „Standard" + alle Snapshots
+- Snapshots direkt editierbar: Phasen umbenennen/einfärben/löschen,
+  Schritte hinzufügen/umbenennen/löschen
+- Neue Prozesse aus editierten Snapshots übernehmen die aktuelle Version;
+  bestehende Prozesse unberührt
+
+### Neu: Zugriffsliste mit Prozess-Zugehörigkeit
+
+- Spalte „Zugewiesen in" zeigt für jede Person farbige Badges welchen
+  Prozessen sie zugewiesen ist (blau = verantwortlich, lila = mitarbeitend)
+
+### Neu: Erscheinungsbild-Einstellungen
+
+- Schulname, App-Titel, Primär-/Sekundärfarbe, Logo (PNG/JPG/SVG)
+  über Admin-Bereich konfigurierbar
+- Vorschau-Workflow: Änderungen erst nach „Für alle aktivieren" live
+- Migration `003_einstellungen.sql`
+
+### Neu: Hilfe-Seite
+
+- Ohne Login zugänglich; zwei Tabs: Erste Schritte + FAQ (10 Fragen)
+- Schulname aus Einstellungen dynamisch eingesetzt
+
+### Behoben
+
+- Prozess-Tabs wechselten Ansicht nicht (Query-Parameter-Bug im Router)
+- `aktiv`-Flag aus Prozess-Logik entfernt; alle zugewiesenen Prozesse
+  gleichzeitig nutzbar
+- Gantt-Datumsachse überlappt nicht mehr (dynamische Label-Ausdünnung)
+- Gantt als echte HTML-Tabelle für garantierte Spaltenausrichtung
+- Doppelte Gantt/Timeline-Tabs beim Wechsel behoben
+- Logo-Upload: finfo-Fallback, ob_start-Fix, Signatur-Korrektur
 
 ---
 

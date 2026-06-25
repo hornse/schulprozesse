@@ -2833,69 +2833,72 @@ function renderFaq(schulname) {
   const fragen = [
     {
       frage: 'Ich kann mich nicht anmelden, obwohl mein Passwort korrekt ist.',
-      antwort: `Ein korrektes WebUntis-Passwort allein reicht nicht aus. Zusätzlich muss ein Admin 
-                dieser App dich in der Zugriffsliste freigegeben haben. Wende dich an die zuständige 
-                Person an ${schulname} und bitte um Freischaltung mit deinem WebUntis-Kürzel.`,
+      antwort: `Ein korrektes WebUntis-Passwort allein reicht nicht. Zusätzlich muss ein Admin
+                dieser App dich freigegeben haben. Wende dich an die zuständige Person und bitte
+                um Freischaltung mit deinem WebUntis-Kürzel.`,
     },
     {
       frage: 'Ich sehe nach dem Anmelden keine Checkliste.',
-      antwort: `Du musst nicht nur zur App zugelassen sein, sondern auch einem oder mehreren 
-                Prozessen als Teilnehmer zugewiesen werden. Das macht ein Admin oder der Verantwortliche 
-                des Prozesses. Sprich die zuständige Person an.`,
+      antwort: `Du musst nicht nur zur App zugelassen sein, sondern auch einem Prozess als
+                Teilnehmer zugewiesen werden. Das macht ein Admin oder der Verantwortliche
+                des Prozesses.`,
     },
     {
       frage: 'Ich habe versehentlich ein Häkchen gesetzt. Kann ich das rückgängig machen?',
-      antwort: `Ja. Klappe den Schritt auf und klicke erneut auf das Häkchen – es lässt sich 
-                wieder entfernen. Die Aktion wird im Aktivitätsprotokoll aufgezeichnet, 
-                aber das ist kein Problem.`,
+      antwort: `Ja – Schritt aufklappen und erneut auf das Häkchen klicken. Es lässt sich
+                wieder entfernen.`,
     },
     {
-      frage: 'Wer kann meine Kommentare und Verantwortlichen-Einträge sehen?',
-      antwort: `Kommentare und Verantwortlichen-Einträge sind nur für angemeldete Personen sichtbar 
-                die dem Prozess zugewiesen sind. Das öffentliche Dashboard zeigt diese Informationen 
-                bewusst nicht an.`,
+      frage: 'Was bedeutet „Prozess verwalten" und wer sieht diesen Tab?',
+      antwort: `Der Tab „Prozess verwalten" erscheint nur wenn du für mindestens einen Prozess
+                als Verantwortliche:r eingetragen bist. Dort kannst du Teilnehmer zuweisen,
+                Sichtbarkeit ändern, Phasennamen und -farben anpassen, Schritte umbenennen
+                oder ausblenden und eigene Phasen mit eigenen Schritten anlegen.`,
+    },
+    {
+      frage: 'Was passiert wenn ich einen Schritt umbenenne oder eine Phase einfärbe?',
+      antwort: `Alle Änderungen unter „Prozess verwalten → Schritte anpassen" betreffen
+                ausschließlich diesen einen Prozess. Die globale Vorlage und alle anderen
+                Prozesse bleiben vollständig unberührt. Du kannst jederzeit auf den
+                Vorlage-Standard zurücksetzen.`,
+    },
+    {
+      frage: 'Was ist der Unterschied zwischen Vorlage und Prozess?',
+      antwort: `Die Vorlage ist die Schablone (wie eine Klasse in der Programmierung) –
+                sie definiert welche Phasen und Schritte es gibt. Ein Prozess ist eine
+                konkrete Instanz dieser Vorlage (z. B. „WebUntis Schuljahreswechsel 2026/2027").
+                Jeder Prozess kann seine eigene Anpassung der Vorlage haben.`,
+    },
+    {
+      frage: 'Was ist der Unterschied zwischen „Verantwortlich" und „Mitarbeitend"?',
+      antwort: `Verantwortliche können den Prozess vollständig verwalten: Teilnehmer zuweisen,
+                Schritte und Phasen anpassen, Sichtbarkeit schalten.
+                Mitarbeitende können Häkchen setzen, Kommentare schreiben und Daten eintragen.`,
+    },
+    {
+      frage: 'Wer kann meine Kommentare sehen?',
+      antwort: `Kommentare sind nur für angemeldete Teilnehmer des jeweiligen Prozesses
+                sichtbar. Das öffentliche Dashboard zeigt keine Kommentare.`,
     },
     {
       frage: 'Kann ich die App auf dem Smartphone nutzen?',
-      antwort: `Ja. Die App ist für mobile Geräte optimiert. Öffne einfach die URL in deinem 
-                Smartphone-Browser. Eine separate App zum Installieren gibt es nicht.`,
+      antwort: `Ja – die App ist für mobile Geräte optimiert. Einfach die URL im
+                Smartphone-Browser aufrufen, keine separate App nötig.`,
     },
     {
-      frage: 'Was ist der Unterschied zwischen "Verantwortlich" und "Mitarbeitend"?',
-      antwort: `Verantwortliche können den Prozess vollständig verwalten: Teilnehmer hinzufügen, 
-                Schritte und Phasen bearbeiten, den Prozess öffentlich oder privat schalten. 
-                Mitarbeitende können Häkchen setzen, Kommentare schreiben und Daten wie Termine 
-                eintragen – aber keine strukturellen Änderungen vornehmen.`,
+      frage: 'Wie drucke ich eine Checkliste oder exportiere als CSV?',
+      antwort: `In der Checklisten-Ansicht gibt es oben die Buttons „⬇ CSV" und „🖨 PDF".
+                CSV öffnet direkt in Excel/LibreOffice. PDF öffnet den Browser-Druckdialog.`,
     },
     {
       frage: 'Was passiert mit meinen Daten?',
-      antwort: `Die App speichert nur das was zur Koordination der Schulprozesse nötig ist: 
-                Namen, Kürzel (aus WebUntis), Termine, Häkchen und Kommentare. Es findet kein 
-                Tracking statt. Die Daten liegen auf dem Server der Schule und werden nicht 
-                an Dritte weitergegeben.`,
-    },
-    {
-      frage: 'Ich sehe einen Prozess im Dashboard, kann aber nicht auf die Checkliste zugreifen.',
-      antwort: `Das öffentliche Dashboard zeigt alle Prozesse die als „öffentlich" markiert sind – 
-                auch wenn du ihnen nicht zugewiesen bist. Die Checkliste ist nur für zugewiesene 
-                Teilnehmer sichtbar. Lass dich vom Verantwortlichen des Prozesses als Teilnehmer 
-                eintragen.`,
-    },
-    {
-      frage: 'Wie drucke ich eine Checkliste aus?',
-      antwort: `In der Checklisten-Ansicht gibt es oben rechts einen „PDF"-Button. 
-                Dieser öffnet den Druck-Dialog deines Browsers. Wähle dort „Als PDF speichern" 
-                um eine PDF-Datei zu erstellen, oder drucke direkt.`,
-    },
-    {
-      frage: 'Kann ich die Checkliste als Excel-Datei exportieren?',
-      antwort: `Ja. Neben dem PDF-Button gibt es einen „CSV"-Button. Die heruntergeladene Datei 
-                lässt sich in Excel, LibreOffice und Google Sheets öffnen. Sie enthält alle Schritte 
-                mit Terminen, Verantwortlichen und Kommentaren.`,
+      antwort: `Die App speichert nur was zur Koordination nötig ist: Kürzel, Namen, Termine,
+                Status und Kommentare. Kein Tracking, keine Weitergabe an Dritte.
+                Daten liegen auf dem Schulserver.`,
     },
   ];
 
-  fragen.forEach((f, i) => {
+    fragen.forEach((f, i) => {
     const item = document.createElement('div');
     item.className = 'faq-item';
     item.innerHTML = `

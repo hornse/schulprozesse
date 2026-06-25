@@ -1,21 +1,18 @@
 RewriteEngine On
 
-# Auf Uberspace ist diese Domain über einen zusätzlichen DocumentRoot
-# eingerichtet (Symlink von /var/www/virtual/<user>/<domain> auf
-# backend/public, NICHT innerhalb von html/ - siehe docs/INSTALL.md).
-# Für diesen Mechanismus schreibt die Uberspace-Doku diese Zeile vor,
-# sonst greifen die RewriteRules unten nicht zuverlässig.
 RewriteBase /
 
-# Nur /api/... an den PHP-Router weiterleiten. Alles andere in diesem
-# Ordner (index.html, css/, js/) ist statisches Frontend und wird von
-# Apache ganz normal ausgeliefert - dafür braucht es keine Regel.
+# PHP-Konfiguration für Datei-Uploads
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 60
+
+# Logo-Upload direkt an PHP weiterleiten (kein Rewrite-Body-Verlust)
+RewriteRule ^api/einstellungen/logo$ api-router.php?route=api/einstellungen/logo [QSA,L]
+
+# Alle anderen API-Routen
 RewriteRule ^api/(.*)$ api-router.php?route=api/$1 [QSA,L]
 
-# Zweites Sicherheitsnetz: Die SQLite-Datei liegt ohnehin außerhalb dieses
-# Ordners (siehe config/config.example.php) und ist über den Webserver
-# damit gar nicht erreichbar. Diese Regel greift nur, falls das jemand
-# künftig versehentlich ändert.
 <FilesMatch "\.sqlite$">
     Require all denied
 </FilesMatch>

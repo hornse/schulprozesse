@@ -1490,7 +1490,8 @@ function renderInstanzSchrittVerwaltung() {
           }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          render();
+          // Nur Phasenfarben im DOM aktualisieren ohne Seitensprung
+          aktualisierePhaseImDOM(s.phase, f, null);
         }));
         farbBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
@@ -1528,7 +1529,8 @@ function renderInstanzSchrittVerwaltung() {
           }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          render();
+          // Nur Phasennamen im DOM aktualisieren ohne Seitensprung
+          aktualisierePhaseImDOM(s.phase, null, neuerName);
         });
 
         // Zurücksetzen-Button (nur für Vorlage-Phasen sinnvoll)
@@ -1593,21 +1595,41 @@ function renderInstanzSchrittVerwaltung() {
                   style="width:auto;font-size:11px;padding:3px 8px;">
             ${s.deaktiviert ? '↩ reaktivieren' : '✕ ausblenden'}
           </button>`;
-        zeile.querySelector('.instanz-titel-feld').addEventListener('change', async (e) => {
+
+        const titelFeld = zeile.querySelector('.instanz-titel-feld');
+        const origSpan  = zeile.querySelector('.instanz-orig');
+
+        async function speichereTitel() {
+          const neuerTitel = titelFeld.value.trim();
+          const gespeicherterTitel = neuerTitel || null;
           await api(`/api/schritte/${s.id}`, {
-            method: 'PATCH', body: { instanz_titel: e.target.value.trim() || null }
+            method: 'PATCH', body: { instanz_titel: gespeicherterTitel }
           });
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          block.replaceWith(renderInstanzSchrittVerwaltung());
+          // STATE direkt aktualisieren ohne Seitensprung
+          const gefunden = STATE.schritte.find((sc) => sc.id === s.id);
+          if (gefunden) gefunden.instanz_titel = gespeicherterTitel;
+          // Visuelles Feedback: Original-Hinweis aktualisieren
+          origSpan.textContent = gespeicherterTitel ? '← ' + origTitel : '';
+          titelFeld.style.background = '#e8f5e9';
+          setTimeout(() => { titelFeld.style.background = ''; }, 800);
+        }
+
+        titelFeld.addEventListener('blur', speichereTitel);
+        titelFeld.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); titelFeld.blur(); }
         });
+
         zeile.querySelector('[data-toggle-deakt]').addEventListener('click', async () => {
           await api(`/api/schritte/${s.id}`, {
             method: 'PATCH', body: { deaktiviert: s.deaktiviert ? 0 : 1 }
           });
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          block.replaceWith(renderInstanzSchrittVerwaltung());
+          // Zeile visuell aktualisieren ohne Seitensprung
+          zeile.classList.toggle('deaktiviert', !s.deaktiviert);
+          zeile.querySelector('[data-toggle-deakt]').textContent =
+            s.deaktiviert ? '✕ ausblenden' : '↩ reaktivieren';
+          s.deaktiviert = s.deaktiviert ? 0 : 1;
         });
         aktuelleSchrittListe.appendChild(zeile);
       });
@@ -1838,6 +1860,29 @@ function renderInstanzSchrittVerwaltung() {
   neuePhaseBlock.appendChild(speichernBtn);
 
   return block;
+}
+
+/**
+ * Aktualisiert Phasenfarbe und/oder -name direkt im DOM ohne Seitensprung.
+ * Sucht alle Elemente mit data-phase-name und aktualisiert sie.
+ */
+function aktualisierePhaseImDOM(phaseName, neueFarbe, neuerName) {
+  // Phase-Titel in der Checkliste aktualisieren
+  document.querySelectorAll('.phase-title').forEach((el) => {
+    if (el.textContent.includes(phaseName.replace(/^\d+\.\s*/, ''))) {
+      if (neueFarbe) el.style.color = neueFarbe;
+      if (neuerName) el.textContent = el.textContent.replace(
+        phaseName.replace(/^\d+\.\s*/, ''), neuerName
+      );
+    }
+  });
+  // Schritt-Akzentfarben aktualisieren
+  if (neueFarbe) {
+    document.querySelectorAll('.schritt').forEach((el) => {
+      const phase = el.dataset.phase;
+      if (phase === phaseName) el.style.setProperty('--accent', neueFarbe);
+    });
+  }
 }
 
 async function ladeProzessSchritteMitDeaktivierten(prozessId) {

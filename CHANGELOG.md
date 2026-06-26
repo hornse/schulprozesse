@@ -16,6 +16,27 @@ Geplant:
 
 ---
 
+## [2.0.1] – 2026-06-26
+
+### Hinzugefügt
+- **deploy.sh** – Deploy-Script das automatisch den Cache-Busting-Timestamp
+  in `index.html` aktualisiert (Format `YYYYMMDDHHMM`) und auf beide
+  Remotes pusht; ab jetzt `./deploy.sh "Nachricht"` statt manuellem push
+- **deploy/uberspace.md** – vollständige Dokumentation aller
+  serverseitigen Konfigurationen die nicht in git versioniert sind:
+  supervisord-Config, web backend, Domain-Symlink, git bare repo,
+  Migrationen, Logs aktivieren/deaktivieren
+- **Vollständiges Handbuch** als dritter Tab auf der Hilfe-Seite –
+  10 Kapitel ohne Login zugänglich
+- **Zugriffsliste** zeigt Prozess-Zugehörigkeit als farbige Badges
+
+### Behoben
+- Datei-Header aller PHP-Dateien auf korrekten Projektnamen aktualisiert
+- `.htaccess` mit Erklärung warum sie nur Fallback ist
+- Doppelter `[Unreleased]`-Block im Changelog entfernt
+
+---
+
 ## [2.0.0] – 2026-06-25
 
 ### Neu: Prozess-Instanz-Anpassungen (Kernfeature)

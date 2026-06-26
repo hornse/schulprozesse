@@ -169,10 +169,39 @@ sqlite3 data/app.sqlite \
 
 ## Laufender Betrieb
 
+### Deployen
+
 ```bash
+./deploy.sh "Beschreibung der Änderung"
+```
+
+Das Script macht automatisch:
+1. Cache-Busting-Timestamp in `index.html` aktualisieren (Format `YYYYMMDDHHMM`)
+2. `git add -A && git commit`
+3. `git push github main && git push uberspace main`
+
+Der post-receive Hook auf dem Server deployt automatisch nach `git push uberspace main`.
+Ein `supervisorctl restart` ist normalerweise nicht nötig da PHP-Dateien
+bei jedem Request neu geladen werden.
+
+Manuell (ohne Script):
+```bash
+# Cache-Busting manuell aktualisieren
+python3 -c "
+import re, datetime
+ts = datetime.datetime.now().strftime('%Y%m%d%H%M')
+content = open('backend/public/index.html').read()
+open('backend/public/index.html', 'w').write(re.sub(r'\?v=\d+', f'?v={ts}', content))
+print(f'Timestamp: {ts}')
+"
 git add -A && git commit -m "Beschreibung"
 git push github main && git push uberspace main
 ```
+
+### Uberspace-spezifische Konfiguration
+
+Alles was nur auf dem Server konfiguriert ist (supervisord, web backend,
+Symlinks, Logs) ist dokumentiert in `deploy/uberspace.md`.
 
 ---
 

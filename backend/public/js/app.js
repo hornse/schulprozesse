@@ -3046,7 +3046,11 @@ function renderHandbuch(schulname) {
         Spalte „Zugewiesen in" zeigt farbige Badges welchen Prozessen jemand zugewiesen ist.</p>
 
         <p><strong>Vorlage verwalten:</strong> Standard-Vorlagentabelle (globale Phasen/Schritte)
-        pflegen – betrifft neue Prozesse ohne Snapshot-Basis.</p>`,
+        pflegen – betrifft neue Prozesse ohne Snapshot-Basis.</p>
+
+        <p><strong>Deployen (für Entwickler):</strong> Änderungen am Code werden mit
+        <code>./deploy.sh "Beschreibung"</code> eingespielt. Das Script aktualisiert
+        automatisch den Browser-Cache-Timestamp und pusht auf Server und GitHub.</p>`,
     },
     {
       titel: 'Rollen im Überblick',

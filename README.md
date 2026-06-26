@@ -131,6 +131,16 @@ sqlite3 data/app.sqlite < migrations/004_instanz_anpassungen.sql
 php -S localhost:8000 -t backend/public dev-router.php
 ```
 
+## Deployen (Uberspace)
+
+```bash
+./deploy.sh "Beschreibung der Änderung"
+```
+
+Das Script aktualisiert automatisch den Cache-Busting-Timestamp in `index.html`
+und pusht auf GitHub und Uberspace. Details zur Uberspace-Konfiguration
+(supervisord, web backend, Symlinks) in `deploy/uberspace.md`.
+
 ---
 
 ## Lizenz

@@ -8,11 +8,32 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 ## [Unreleased]
 
 Geplant:
-- Fortschrittsanzeige im Prozess-Tab (z. B. „Abitur (4/17)")
-- Schritte duplizieren
-- Archiv-Ansicht für abgeschlossene Prozesse
+- Schritte duplizieren (phasenübergreifend)
 - E-Mail-Erinnerungen bei überfälligen Schritten
 - Alles-zurücksetzen für Prozess-Instanz-Anpassungen
+
+---
+
+## [2.1.0] – 2026-06-26
+
+### Hinzugefügt
+- **Prozess-Archiv** – Admins können Prozesse archivieren statt löschen;
+  archivierte Prozesse verschwinden aus den Tabs und sind für Nutzer
+  unsichtbar; unter Admin → Prozesse → Tab „Archiv" jederzeit reaktivierbar
+- **Fortschrittsbalken in Prozess-Tabs** – jeder Prozess-Tab zeigt einen
+  dünnen farbigen Balken am unteren Rand der den Erledigungsgrad anzeigt
+  (aktiver Tab: Akzentfarbe, inaktive: grau); Tooltip zeigt `X/Y Schritte (Z%)`
+- **Vorlage-Schritte anlegen** – `+`-Button in der Admin-Vorlagenverwaltung
+  legt Schritte korrekt für alle bestehenden Prozesse als Instanz an
+  (vorheriger Bug: Referenz auf alte `schuljahre`-Tabelle)
+
+### Behoben
+- `handleDeletePhase` – SQL-Injection-Lücke durch String-Interpolation
+  in Guard-Abfrage geschlossen; jetzt sauber mit Prepared Statement
+- `export.php` – Variablenname `$schuljahrId` → `$prozessId` umbenannt
+- `vorlagen-sets.php` – veralteten Kommentar aktualisiert
+- `handleListProzesse` – filtert jetzt korrekt nach `aktiv = 1`;
+  archivierte Prozesse nur bei `?mit_archiv=1` sichtbar
 
 ---
 

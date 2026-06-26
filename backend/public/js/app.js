@@ -581,9 +581,20 @@ function renderProzessLeiste() {
   sichtbareProzesse.forEach((p) => {
     const tab = document.createElement('button');
     tab.className = 'prozess-tab' + (p.id === STATE.prozessId ? ' aktiv' : '');
-    const schloss = p.oeffentlich ? '' : ' 🔒';
-    tab.textContent = p.label + schloss;
-    tab.title = p.beschreibung || p.label;
+    const schloss   = p.oeffentlich ? '' : ' 🔒';
+    const gesamt    = Number(p.schritt_anzahl   ?? 0);
+    const erledigt  = Number(p.erledigt_anzahl  ?? 0);
+    const prozent   = gesamt > 0 ? Math.round((erledigt / gesamt) * 100) : 0;
+
+    tab.innerHTML = `
+      <span class="prozess-tab-label">${p.label}${schloss}</span>
+      ${gesamt > 0 ? `<span class="prozess-tab-progress">
+        <span class="prozess-tab-bar" style="width:${prozent}%"></span>
+      </span>` : ''}`;
+
+    tab.title = gesamt > 0
+      ? `${p.beschreibung || p.label} – ${erledigt}/${gesamt} Schritte (${prozent}%)`
+      : p.beschreibung || p.label;
     tab.addEventListener('click', async () => {
       if (p.id === STATE.prozessId) return;
       await waehleProzess(p.id);
@@ -3171,8 +3182,11 @@ function renderHandbuch(schulname) {
         Logo (PNG/JPG/SVG, max. 500 KB). Workflow: anpassen → „👁 Vorschau" →
         „⚡ Für alle aktivieren".</p>
 
-        <p><strong>Prozesse:</strong> Übersicht aller Prozesse. Neuen Prozess anlegen
-        mit Name, Sichtbarkeit und Basis (Vorlage, Snapshot oder Leer).</p>
+        <p><strong>Prozesse:</strong> Übersicht aller Prozesse mit zwei Tabs –
+        „Aktive Prozesse" und „Archiv". Neuen Prozess anlegen mit Name, Sichtbarkeit
+        und Basis (Vorlage, Snapshot oder Leer). Bestehende Prozesse können mit
+        „📦 archivieren" aus den Tabs entfernt werden ohne sie zu löschen –
+        unter „Archiv" jederzeit mit „↩ reaktivieren" wiederherstellbar.</p>
 
         <p><strong>Vorlagen-Snapshots:</strong> Tab-Leiste mit Standard + allen Snapshots.
         Snapshots direkt bearbeiten – Phasen/Schritte hinzufügen, umbenennen, löschen.

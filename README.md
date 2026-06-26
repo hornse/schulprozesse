@@ -32,6 +32,8 @@ Analog zur OOP:
 - Mehrere Prozesse gleichzeitig, jeder mit eigener Checkliste und eigenen Teilnehmern
 - Öffentliche Prozesse ohne Login sichtbar, private nur für Teilnehmer
 - Schritte abhaken, Verantwortliche und Termine eintragen, Kommentare
+- **Fortschrittsbalken** in den Prozess-Tabs zeigt Erledigungsgrad auf einen Blick
+- **Archiv** – Prozesse archivieren statt löschen, jederzeit reaktivierbar
 
 **Prozess-Instanz-Anpassungen (ohne Vorlage zu berühren):**
 - Phasennamen und -farben für jeden Prozess individuell überschreiben

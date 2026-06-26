@@ -233,33 +233,43 @@ function handleDeleteTeilnehmer(PDO $db, array $config, array $input, array $par
 function _instanzenAusSnapshot(PDO $db, int $prozessId, int $setId): void
 {
     $setPhasen = $db->prepare(
-        'SELECT id, name, farbe, reihenfolge FROM vorlagen_set_phasen WHERE set_id = :sid ORDER BY reihenfolge'
+        'SELECT id, name, farbe, reihenfolge
+         FROM vorlagen_set_phasen WHERE set_id = :sid ORDER BY reihenfolge'
     );
     $setPhasen->execute([':sid' => $setId]);
     $phasenAusSet = $setPhasen->fetchAll();
 
     if (empty($phasenAusSet)) return;
 
+    // Jeder Snapshot bekommt eigene Phasen und Vorlagen – keine gemeinsamen
+    // Einträge mit anderen Prozessen. Das verhindert ungewollte Seiteneffekte
+    // wenn ein Snapshot mehrfach verwendet wird.
     $insertPhase = $db->prepare(
-        'INSERT OR IGNORE INTO phasen (name, farbe, reihenfolge) VALUES (:name, :farbe, :r)'
+        'INSERT INTO phasen (name, farbe, reihenfolge) VALUES (:name, :farbe, :r)'
     );
-    $findPhase = $db->prepare('SELECT id FROM phasen WHERE name = :name');
     $insertVorlage = $db->prepare(
         'INSERT INTO schritt_vorlagen (phase_id, reihenfolge, titel, beschreibung, kann_parallel)
          VALUES (:phase_id, :r, :titel, :beschreibung, :kp)'
     );
     $insertInstanz = $db->prepare(
-        'INSERT INTO schritt_instanzen (prozess_id, vorlage_id, kann_parallel) VALUES (:p, :v, :kp)'
+        'INSERT INTO schritt_instanzen (prozess_id, vorlage_id, kann_parallel)
+         VALUES (:p, :v, :kp)'
     );
 
     foreach ($phasenAusSet as $setPhase) {
-        $insertPhase->execute([':name' => $setPhase['name'], ':farbe' => $setPhase['farbe'], ':r' => $setPhase['reihenfolge']]);
-        $findPhase->execute([':name' => $setPhase['name']]);
-        $phaseId = (int) $findPhase->fetchColumn();
+        // Neue Phase für diesen Prozess anlegen
+        $insertPhase->execute([
+            ':name'  => $setPhase['name'],
+            ':farbe' => $setPhase['farbe'],
+            ':r'     => $setPhase['reihenfolge'],
+        ]);
+        $phaseId = (int) $db->lastInsertId();
 
         $setSchritte = $db->prepare(
             'SELECT reihenfolge, titel, beschreibung, kann_parallel
-             FROM vorlagen_set_schritte WHERE set_id = :sid AND set_phase_id = :pid ORDER BY reihenfolge'
+             FROM vorlagen_set_schritte
+             WHERE set_id = :sid AND set_phase_id = :pid
+             ORDER BY reihenfolge'
         );
         $setSchritte->execute([':sid' => $setId, ':pid' => $setPhase['id']]);
 
@@ -272,7 +282,11 @@ function _instanzenAusSnapshot(PDO $db, int $prozessId, int $setId): void
                 ':kp'           => $ss['kann_parallel'],
             ]);
             $vorlageId = (int) $db->lastInsertId();
-            $insertInstanz->execute([':p' => $prozessId, ':v' => $vorlageId, ':kp' => $ss['kann_parallel']]);
+            $insertInstanz->execute([
+                ':p'  => $prozessId,
+                ':v'  => $vorlageId,
+                ':kp' => $ss['kann_parallel'],
+            ]);
         }
     }
 }

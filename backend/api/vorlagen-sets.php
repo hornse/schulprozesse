@@ -26,8 +26,7 @@
  *   GET    /api/vorlagen-sets/{id}      – Snapshot-Details (Phasen + Schritte)
  *
  * Die eigentliche Verwendung eines Snapshots beim Anlegen eines Schuljahres
- * läuft über POST /api/schuljahre mit einem optionalen "set_id"-Parameter
- * (siehe schuljahre.php).
+ * läuft über POST /api/prozesse mit einem optionalen "set_id"-Parameter.
  *
  * Alles hier ist admin-only.
  */

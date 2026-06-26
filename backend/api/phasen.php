@@ -118,13 +118,12 @@ function handleDeletePhase(PDO $db, array $config, array $input, array $params):
     // Admins und Verantwortliche (für mindestens einen Prozess) dürfen Phasen löschen
     $user = Guard::requireLogin($db);
     if ($user['rolle'] !== 'admin') {
-        $istVerantwortlich = (int) $db->prepare(
+        $stmt = $db->prepare(
             "SELECT COUNT(*) FROM prozess_teilnehmer
              WHERE webuntis_user = :u AND rolle = 'verantwortlich'"
-        )->execute([':u' => $user['webuntis_user']]) ? $db->query(
-            "SELECT COUNT(*) FROM prozess_teilnehmer
-             WHERE webuntis_user = '{$user['webuntis_user']}' AND rolle = 'verantwortlich'"
-        )->fetchColumn() : 0;
+        );
+        $stmt->execute([':u' => $user['webuntis_user']]);
+        $istVerantwortlich = (int) $stmt->fetchColumn();
 
         if (!$istVerantwortlich) {
             Response::error('Nur Admins und Verantwortliche können Phasen löschen.', 403);

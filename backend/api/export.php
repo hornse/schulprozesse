@@ -20,9 +20,9 @@ function handleListAktivitaeten(PDO $db, array $config, array $input): void
 {
     Guard::requireLogin($db);
 
-    $schuljahrId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
-    if (!$schuljahrId) {
-        $schuljahrId = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetchColumn();
+    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
+    if (!$prozessId) {
+        $prozessId = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetchColumn();
     }
 
     $stmt = $db->prepare(
@@ -33,7 +33,7 @@ function handleListAktivitaeten(PDO $db, array $config, array $input): void
          ORDER BY a.zeitstempel DESC
          LIMIT 200'
     );
-    $stmt->execute([':sj' => $schuljahrId]);
+    $stmt->execute([':sj' => $prozessId]);
     Response::json($stmt->fetchAll());
 }
 
@@ -41,14 +41,14 @@ function handleExportAktivitaeten(PDO $db, array $config, array $input): void
 {
     Guard::requireLogin($db);
 
-    $schuljahrId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
-    if (!$schuljahrId) {
+    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
+    if (!$prozessId) {
         $row = $db->query('SELECT id, label FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
-        $schuljahrId = $row ? (int) $row['id'] : null;
+        $prozessId = $row ? (int) $row['id'] : null;
         $label = $row['label'] ?? 'export';
     } else {
         $row = $db->prepare('SELECT label FROM prozesse WHERE id = :id');
-        $row->execute([':id' => $schuljahrId]);
+        $row->execute([':id' => $prozessId]);
         $label = $row->fetchColumn() ?: 'export';
     }
 
@@ -58,7 +58,7 @@ function handleExportAktivitaeten(PDO $db, array $config, array $input): void
          WHERE a.prozess_id = :sj
          ORDER BY a.zeitstempel DESC'
     );
-    $stmt->execute([':sj' => $schuljahrId]);
+    $stmt->execute([':sj' => $prozessId]);
 
     $dateiname = 'aktivitaeten_' . preg_replace('/[^a-z0-9]/i', '_', $label) . '.csv';
 
@@ -95,19 +95,19 @@ function handleExportCsv(PDO $db, array $config, array $input): void
 {
     Guard::requireLogin($db);
 
-    $schuljahrId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
+    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
 
-    if (!$schuljahrId) {
+    if (!$prozessId) {
         $row = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
-        $schuljahrId = $row ? (int) $row['id'] : null;
+        $prozessId = $row ? (int) $row['id'] : null;
     }
 
-    if (!$schuljahrId) {
+    if (!$prozessId) {
         Response::error('Kein aktives Schuljahr gefunden.', 404);
     }
 
     $schuljahrLabel = $db->prepare('SELECT label FROM prozesse WHERE id = :id');
-    $schuljahrLabel->execute([':id' => $schuljahrId]);
+    $schuljahrLabel->execute([':id' => $prozessId]);
     $label = $schuljahrLabel->fetchColumn() ?: 'export';
 
     $stmt = $db->prepare(
@@ -123,7 +123,7 @@ function handleExportCsv(PDO $db, array $config, array $input): void
          WHERE si.prozess_id = :sj
          ORDER BY p.reihenfolge, sv.reihenfolge'
     );
-    $stmt->execute([':sj' => $schuljahrId]);
+    $stmt->execute([':sj' => $prozessId]);
     $schritte = $stmt->fetchAll();
 
     $dateiname = 'schulprozess_' . preg_replace('/[^a-z0-9]/i', '_', $label) . '.csv';

@@ -261,10 +261,14 @@ async function loescheRolle(webuntis_user) {
 }
 
 async function neueVorlage(phase_id, titel) {
-  await api('/api/vorlagen', { method: 'POST', body: { phase_id, titel } });
-  await ladeAlles();
-  await ladePublicDashboard();
-  render();
+  try {
+    await api('/api/vorlagen', { method: 'POST', body: { phase_id, titel } });
+    await ladeAlles();
+    await ladePublicDashboard();
+    render();
+  } catch (err) {
+    alert('Fehler beim Anlegen: ' + err.message);
+  }
 }
 
 async function vorlageAktualisieren(id, felder) {
@@ -2594,9 +2598,27 @@ function renderPhasenBlock(phase, vorlagen) {
   });
   wrapper.appendChild(liste);
 
-  const neuerSchrittForm = document.createElement('form'); neuerSchrittForm.className = 'inline-form'; neuerSchrittForm.style.cssText = 'margin:6px 8px 10px;';
-  neuerSchrittForm.innerHTML = `<input type="text" class="neuer-schritt-titel" placeholder="Neuer Schritt..." style="flex:1;"><button class="btn" type="submit" style="width:auto;">+</button>`;
-  neuerSchrittForm.addEventListener('submit', (e) => { e.preventDefault(); const t = neuerSchrittForm.querySelector('.neuer-schritt-titel').value.trim(); if (t) neueVorlage(phase.id, t); });
+  const neuerSchrittForm = document.createElement('div');
+  neuerSchrittForm.className = 'inline-form';
+  neuerSchrittForm.style.cssText = 'margin:6px 8px 10px;';
+  const schrittInput = document.createElement('input');
+  schrittInput.type = 'text';
+  schrittInput.className = 'neuer-schritt-titel';
+  schrittInput.placeholder = 'Neuer Schritt...';
+  schrittInput.style.flex = '1';
+  const schrittBtn = document.createElement('button');
+  schrittBtn.className = 'btn';
+  schrittBtn.type = 'button';
+  schrittBtn.style.width = 'auto';
+  schrittBtn.textContent = '+';
+  const doAdd = () => {
+    const t = schrittInput.value.trim();
+    if (t) { neueVorlage(phase.id, t); schrittInput.value = ''; }
+  };
+  schrittBtn.addEventListener('click', doAdd);
+  schrittInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+  neuerSchrittForm.appendChild(schrittInput);
+  neuerSchrittForm.appendChild(schrittBtn);
   wrapper.appendChild(neuerSchrittForm);
   return wrapper;
 }

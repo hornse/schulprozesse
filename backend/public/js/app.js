@@ -2493,9 +2493,15 @@ function renderVorlagenVerwaltung() {
 function renderStandardVorlagenEditor() {
   const wrapper = document.createElement('div');
 
+  // Nur Phasen anzeigen die tatsächlich globale Vorlage-Schritte haben
+  // Phasen die nur für Snapshot-Prozesse angelegt wurden werden hier nicht angezeigt
+  const phasenMitVorlagen = STATE.phasen.filter((p) =>
+    STATE.vorlagen.some((v) => v.phase_id === p.id)
+  );
+
   const phasenListe = document.createElement('div');
   phasenListe.className = 'phasen-liste';
-  for (const phase of STATE.phasen) {
+  for (const phase of phasenMitVorlagen) {
     const vorlagenDerPhase = STATE.vorlagen
       .filter((v) => v.phase_id === phase.id)
       .sort((a, b) => a.reihenfolge - b.reihenfolge);
@@ -2505,7 +2511,7 @@ function renderStandardVorlagenEditor() {
   phasenListe.addEventListener('drop', (e) => {
     if (!dragZustandPhase) return; e.preventDefault();
     const zielEl = e.target.closest('[data-phasen-block-id]');
-    const alleIds = STATE.phasen.map((p) => p.id);
+    const alleIds = phasenMitVorlagen.map((p) => p.id);
     const ohne = alleIds.filter((id) => id !== dragZustandPhase.id);
     const zielId = zielEl ? Number(zielEl.dataset.phasenBlockId) : null;
     const zi = zielId ? ohne.indexOf(zielId) : -1;

@@ -2502,11 +2502,12 @@ function renderStandardVorlagenEditor() {
 
   const phasenListe = document.createElement('div');
   phasenListe.className = 'phasen-liste';
-  for (const phase of phasenMitVorlagen) {
+  for (const [phasenIndex, phase] of phasenMitVorlagen.entries()) {
     const vorlagenDerPhase = STATE.vorlagen
       .filter((v) => v.phase_id === phase.id)
       .sort((a, b) => a.reihenfolge - b.reihenfolge);
-    phasenListe.appendChild(renderPhasenBlock(phase, vorlagenDerPhase));
+    const block = renderPhasenBlock(phase, vorlagenDerPhase, phasenIndex + 1);
+    phasenListe.appendChild(block);
   }
   phasenListe.addEventListener('dragover', (e) => { if (dragZustandPhase) e.preventDefault(); });
   phasenListe.addEventListener('drop', (e) => {
@@ -2668,15 +2669,16 @@ function renderSnapshotEditor(snapshot, setId) {
   return wrapper;
 }
 
-function renderPhasenBlock(phase, vorlagen) {
+function renderPhasenBlock(phase, vorlagen, nummer) {
   const wrapper = document.createElement('div');
   wrapper.className = 'phasen-block'; wrapper.dataset.phasenBlockId = phase.id; wrapper.draggable = true;
 
   const kopf = document.createElement('div'); kopf.className = 'phasen-kopf'; kopf.style.setProperty('--phase-farbe', phase.farbe);
   const griff = document.createElement('span'); griff.className = 'zieh-griff phasen-griff'; griff.title = 'Phase verschieben'; griff.textContent = '⠿';
-  const nummer = STATE.phasen.findIndex((p) => p.id === phase.id) + 1;
+  // Nummer: entweder explizit übergeben oder aus STATE.phasen berechnen
+  const nr = nummer ?? (STATE.phasen.findIndex((p) => p.id === phase.id) + 1);
   const nameOhneNr = phase.name.replace(/^\d+\.\s*/, '');
-  const nummerSpan = document.createElement('span'); nummerSpan.className = 'phasen-nummer'; nummerSpan.style.cssText = 'color:var(--phase-farbe);font-weight:700;font-size:14px;flex-shrink:0;'; nummerSpan.textContent = nummer + '.';
+  const nummerSpan = document.createElement('span'); nummerSpan.className = 'phasen-nummer'; nummerSpan.style.cssText = 'color:var(--phase-farbe);font-weight:700;font-size:14px;flex-shrink:0;'; nummerSpan.textContent = nr + '.';
   const nameFeld = document.createElement('input'); nameFeld.type = 'text'; nameFeld.className = 'phasen-name-feld'; nameFeld.value = nameOhneNr; nameFeld.placeholder = 'Phasenname';
   nameFeld.addEventListener('change', (e) => phaseAktualisieren(phase.id, { name: e.target.value.replace(/^\d+\.\s*/, '') }));
 

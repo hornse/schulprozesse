@@ -88,11 +88,14 @@ function handleCreateVorlage(PDO $db, array $config, array $input): void
         ]);
         $vorlageId = (int) $db->lastInsertId();
 
-        $aktivesSchuljahr = $db->query('SELECT id FROM schuljahre WHERE aktiv = 1 LIMIT 1')->fetchColumn();
-        if ($aktivesSchuljahr) {
-            $db->prepare(
-                'INSERT INTO schritt_instanzen (schuljahr_id, vorlage_id, kann_parallel) VALUES (:sj, :v, 0)'
-            )->execute([':sj' => $aktivesSchuljahr, ':v' => $vorlageId]);
+        // Neue Vorlage für alle bestehenden Prozesse als Instanz anlegen
+        $prozesse = $db->query('SELECT id FROM prozesse')->fetchAll();
+        $instanzStmt = $db->prepare(
+            'INSERT INTO schritt_instanzen (prozess_id, vorlage_id, kann_parallel)
+             VALUES (:pid, :vid, 0)'
+        );
+        foreach ($prozesse as $p) {
+            $instanzStmt->execute([':pid' => $p['id'], ':vid' => $vorlageId]);
         }
 
         $db->commit();

@@ -28,8 +28,10 @@ function handleListProzesse(PDO $db, array $config, array $input): void
     if ($user['rolle'] === 'admin') {
         $rows = $db->query(
             "SELECT p.*,
-                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id) as schritt_anzahl,
-                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1) as erledigt_anzahl,
+                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.deaktiviert = 0)
+                     + (SELECT COUNT(*) FROM instanz_schritte is2 WHERE is2.prozess_id = p.id AND is2.deaktiviert = 0) as schritt_anzahl,
+                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1)
+                     + (SELECT COUNT(*) FROM instanz_schritte is2 WHERE is2.prozess_id = p.id AND is2.erledigt = 1) as erledigt_anzahl,
                     (SELECT COUNT(*) FROM prozess_teilnehmer pt WHERE pt.prozess_id = p.id) as teilnehmer_anzahl,
                     'admin' as meine_rolle
              FROM prozesse p
@@ -39,8 +41,10 @@ function handleListProzesse(PDO $db, array $config, array $input): void
     } else {
         $stmt = $db->prepare(
             "SELECT p.*,
-                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id) as schritt_anzahl,
-                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1) as erledigt_anzahl,
+                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.deaktiviert = 0)
+                     + (SELECT COUNT(*) FROM instanz_schritte is2 WHERE is2.prozess_id = p.id AND is2.deaktiviert = 0) as schritt_anzahl,
+                    (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1)
+                     + (SELECT COUNT(*) FROM instanz_schritte is2 WHERE is2.prozess_id = p.id AND is2.erledigt = 1) as erledigt_anzahl,
                     (SELECT COUNT(*) FROM prozess_teilnehmer pt WHERE pt.prozess_id = p.id) as teilnehmer_anzahl,
                     pt.rolle as meine_rolle
              FROM prozesse p

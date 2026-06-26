@@ -1608,6 +1608,8 @@ function renderInstanzSchrittVerwaltung() {
                  placeholder="${origTitel.replace(/"/g, '&quot;')}"
                  title="Umbenennen (nur für diesen Prozess)">
           <span class="instanz-orig">${s.instanz_titel ? '← ' + origTitel : ''}</span>
+          <button class="btn-sekundaer btn" data-dup
+                  style="width:auto;font-size:11px;padding:3px 8px;" title="Schritt duplizieren">⎘</button>
           <button class="btn-sekundaer btn" data-toggle-deakt
                   style="width:auto;font-size:11px;padding:3px 8px;">
             ${s.deaktiviert ? '↩ reaktivieren' : '✕ ausblenden'}
@@ -1661,6 +1663,24 @@ function renderInstanzSchrittVerwaltung() {
         titelFeld.addEventListener('blur', speichereTitel);
         titelFeld.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); titelFeld.blur(); }
+        });
+
+        zeile.querySelector('[data-dup]').addEventListener('click', async () => {
+          const neuerTitel = prompt(`Titel der Kopie:\n(leer für "${origTitel} (Kopie)")`) ?? '';
+          if (neuerTitel === null) return;
+          try {
+            await api(`/api/schritte/${s.id}/duplizieren`, {
+              method: 'POST',
+              body: {
+                titel: neuerTitel,
+                ziel_prozess_id: STATE.prozessId,
+                ziel_phase_id: s.phase_id,
+              },
+            });
+            const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+            STATE.schritte = res.schritte;
+            block.replaceWith(renderInstanzSchrittVerwaltung());
+          } catch (err) { alert('Fehler: ' + err.message); }
         });
 
         zeile.querySelector('[data-toggle-deakt]').addEventListener('click', async () => {
@@ -2774,6 +2794,7 @@ function renderVorlagenZeile(v) {
         <span class="toggle-label">⇉ Default</span>
       </label>
       <button class="btn-sekundaer btn" data-toggle-aktiv style="width:auto;">${v.aktiv ? 'deaktivieren' : 'reaktivieren'}</button>
+      <button class="btn-sekundaer btn" data-duplizieren style="width:auto;" title="Schritt duplizieren">⎘</button>
       <span class="chev" data-rolle="vorlagen-chevron">▸</span>
     </div>
     <div class="schritt-detail" data-rolle="vorlagen-detail" style="padding:0 14px 14px 26px;">
@@ -2808,6 +2829,24 @@ function renderVorlagenZeile(v) {
         ta.focus(); ta.setSelectionRange(s+a.length+3, s+a.length+11); ta.dispatchEvent(new Event('input'));
       }
     });
+  });
+
+  wrapper.querySelector('[data-duplizieren]').addEventListener('click', async () => {
+    // Dialog: Zielphase wählen
+    const standardPhasen = STATE.phasen.filter((p) => !p.quelle || p.quelle === 'standard');
+    const phaseOptionen = standardPhasen.map((p) =>
+      `<option value="${p.id}" ${p.id === v.phase_id ? 'selected' : ''}>${p.name}</option>`
+    ).join('');
+    const neuerTitel = prompt(`Titel der Kopie:\n(leer lassen für "${v.titel} (Kopie)")`) ?? '';
+    if (neuerTitel === null) return; // Abgebrochen
+    try {
+      await api(`/api/schritte/${v.id}/duplizieren`, {
+        method: 'POST',
+        body: { titel: neuerTitel, ziel_phase_id: v.phase_id },
+      });
+      await ladeAlles();
+      render();
+    } catch (err) { alert('Fehler: ' + err.message); }
   });
 
   const vorlagenDetailEl = wrapper.querySelector('[data-rolle="vorlagen-detail"]');

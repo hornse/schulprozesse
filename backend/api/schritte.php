@@ -396,3 +396,91 @@ function handleDeleteInstanzPhase(PDO $db, array $config, array $input, array $p
 
     Response::json(['ok' => true]);
 }
+
+// ============================================================================
+// Schritt duplizieren
+// Kopiert einen Vorlage-Schritt oder eigenen Schritt in eine Zielphase.
+// Admins können in die Standard-Vorlage duplizieren,
+// Verantwortliche in ihre Prozess-Instanz.
+// ============================================================================
+
+function handleDuplizierenSchritt(PDO $db, array $config, array $input, array $params): void
+{
+    $user = Guard::requireLogin($db);
+    $id   = (int) $params['id'];
+
+    $zielPhaseId  = isset($input['ziel_phase_id'])  ? (int) $input['ziel_phase_id']  : null;
+    $zielProzessId = isset($input['ziel_prozess_id']) ? (int) $input['ziel_prozess_id'] : null;
+    $neuerTitel   = trim((string) ($input['titel'] ?? ''));
+
+    // Quell-Schritt laden
+    $stmt = $db->prepare(
+        'SELECT sv.titel, sv.beschreibung, sv.kann_parallel, sv.phase_id, sv.reihenfolge
+         FROM schritt_vorlagen sv WHERE sv.id = :id'
+    );
+    $stmt->execute([':id' => $id]);
+    $quelle = $stmt->fetch();
+    if (!$quelle) Response::error('Schritt nicht gefunden.', 404);
+
+    $titel = $neuerTitel ?: $quelle['titel'] . ' (Kopie)';
+
+    if ($zielProzessId) {
+        // In Prozess-Instanz duplizieren (als instanz_schritt)
+        Guard::requireProzessVerantwortlich($db, $zielProzessId);
+
+        // Phasenname der Zielphase ermitteln
+        $phaseStmt = $db->prepare('SELECT name, farbe FROM phasen WHERE id = :id');
+        $phaseStmt->execute([':id' => $zielPhaseId ?? $quelle['phase_id']]);
+        $phase = $phaseStmt->fetch();
+
+        $maxR = (int) $db->query(
+            "SELECT COALESCE(MAX(reihenfolge), 0) FROM instanz_schritte WHERE prozess_id = $zielProzessId"
+        )->fetchColumn();
+
+        $db->prepare(
+            'INSERT INTO instanz_schritte
+             (prozess_id, phase_name, phase_farbe, reihenfolge, titel, beschreibung, erstellt_von)
+             VALUES (:pid, :pname, :pfarbe, :r, :titel, :beschreibung, :von)'
+        )->execute([
+            ':pid'          => $zielProzessId,
+            ':pname'        => $phase['name'] ?? 'Eigene Schritte',
+            ':pfarbe'       => $phase['farbe'] ?? '#7F8C8D',
+            ':r'            => $maxR + 1,
+            ':titel'        => $titel,
+            ':beschreibung' => $quelle['beschreibung'],
+            ':von'          => $user['webuntis_user'],
+        ]);
+        Response::json(['id' => (int) $db->lastInsertId(), 'typ' => 'instanz'], 201);
+
+    } else {
+        // In Standard-Vorlage duplizieren (als schritt_vorlage)
+        Guard::requireAdmin($db);
+        $phaseId = $zielPhaseId ?? $quelle['phase_id'];
+
+        $maxR = (int) $db->query(
+            "SELECT COALESCE(MAX(reihenfolge), 0) FROM schritt_vorlagen WHERE phase_id = $phaseId"
+        )->fetchColumn();
+
+        $db->prepare(
+            'INSERT INTO schritt_vorlagen (phase_id, reihenfolge, titel, beschreibung, kann_parallel)
+             VALUES (:phase_id, :r, :titel, :beschreibung, :kp)'
+        )->execute([
+            ':phase_id'     => $phaseId,
+            ':r'            => $maxR + 1,
+            ':titel'        => $titel,
+            ':beschreibung' => $quelle['beschreibung'],
+            ':kp'           => $quelle['kann_parallel'],
+        ]);
+        $neueVorlageId = (int) $db->lastInsertId();
+
+        // Instanz für alle Prozesse anlegen
+        $prozesse = $db->query('SELECT id FROM prozesse WHERE aktiv = 1')->fetchAll();
+        $ins = $db->prepare(
+            'INSERT INTO schritt_instanzen (prozess_id, vorlage_id, kann_parallel) VALUES (:p, :v, :kp)'
+        );
+        foreach ($prozesse as $p) {
+            $ins->execute([':p' => $p['id'], ':v' => $neueVorlageId, ':kp' => $quelle['kann_parallel']]);
+        }
+        Response::json(['id' => $neueVorlageId, 'typ' => 'vorlage'], 201);
+    }
+}

@@ -8,9 +8,29 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 ## [Unreleased]
 
 Geplant:
-- Schritte duplizieren (phasenübergreifend)
 - E-Mail-Erinnerungen bei überfälligen Schritten
 - Alles-zurücksetzen für Prozess-Instanz-Anpassungen
+
+---
+
+## [2.2.0] – 2026-06-26
+
+### Hinzugefügt
+- **Schritte duplizieren** – jeder Vorlage-Schritt (Admin) und jeder
+  Instanz-Schritt (Verantwortliche) kann mit dem ⎘-Button kopiert werden;
+  Zielphase und neuer Titel wählbar; Kopie landet in der Standard-Vorlage
+  (für Admins) oder als eigener Schritt im Prozess (für Verantwortliche)
+- **Fortschrittsbalken zählt eigene Schritte** – `instanz_schritte` werden
+  jetzt in `schritt_anzahl` und `erledigt_anzahl` mitgezählt
+
+### Behoben
+- **Standard-Vorlage** zeigt jetzt korrekt nur eigene Phasen (`quelle='standard'`);
+  Phasen aus Snapshot-Prozessen werden nicht mehr angezeigt
+- **Phasen-Nummerierung** in der Standard-Vorlage korrekt (1, 2, 3, 4, 5)
+- **`_instanzenAusSnapshot`** – legt jetzt eigene Phasen pro Prozess an
+  statt gemeinsame Phasen zu teilen; verhindert ungewollte Seiteneffekte
+- **`aktiv`-Flag** in `prozesse` – neue Prozesse bekommen `aktiv = 1`;
+  `handleListProzesse` filtert korrekt nach aktiven Prozessen
 
 ---
 

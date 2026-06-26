@@ -35,11 +35,16 @@
 use App\Guard;
 use App\Response;
 
-function handleListPhasen(PDO $db): void
+function handleListPhasen(PDO $db, array $config, array $input): void
 {
-    Guard::requireAdmin($db);
+    // nur_standard=1 liefert nur Standard-Vorlagenphasen (für Admin-Vorlage-Editor)
+    // Ohne Parameter: alle Phasen (für Schritte-Dropdowns etc.)
+    $nurStandard = !empty($input['nur_standard']);
+    $filter = $nurStandard ? "WHERE quelle = 'standard'" : '';
+
     $rows = $db->query(
-        'SELECT id, name, farbe, reihenfolge FROM phasen ORDER BY reihenfolge'
+        "SELECT id, name, farbe, reihenfolge, COALESCE(quelle,'standard') as quelle
+         FROM phasen $filter ORDER BY reihenfolge"
     )->fetchAll();
     Response::json($rows);
 }
@@ -58,7 +63,7 @@ function handleCreatePhase(PDO $db, array $config, array $input): void
     $maxReihenfolge = (int) $db->query('SELECT COALESCE(MAX(reihenfolge), 0) FROM phasen')->fetchColumn();
 
     $db->prepare(
-        'INSERT INTO phasen (name, farbe, reihenfolge) VALUES (:name, :farbe, :r)'
+        'INSERT INTO phasen (name, farbe, reihenfolge, quelle) VALUES (:name, :farbe, :r, "standard")'
     )->execute([':name' => $name, ':farbe' => $farbe, ':r' => $maxReihenfolge + 1]);
 
     Response::json(['id' => (int) $db->lastInsertId()], 201);

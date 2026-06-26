@@ -2493,10 +2493,11 @@ function renderVorlagenVerwaltung() {
 function renderStandardVorlagenEditor() {
   const wrapper = document.createElement('div');
 
-  // Nur Phasen anzeigen die tatsächlich globale Vorlage-Schritte haben
-  // Phasen die nur für Snapshot-Prozesse angelegt wurden werden hier nicht angezeigt
+  // Nur Standard-Vorlagenphasen anzeigen (quelle='standard')
+  // Phasen die durch Snapshot-Prozesse angelegt wurden (quelle='prozess')
+  // gehören nicht zur Standard-Vorlage
   const phasenMitVorlagen = STATE.phasen.filter((p) =>
-    STATE.vorlagen.some((v) => v.phase_id === p.id)
+    !p.quelle || p.quelle === 'standard'
   );
 
   const phasenListe = document.createElement('div');

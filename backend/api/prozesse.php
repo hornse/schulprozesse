@@ -245,7 +245,7 @@ function _instanzenAusSnapshot(PDO $db, int $prozessId, int $setId): void
     // Einträge mit anderen Prozessen. Das verhindert ungewollte Seiteneffekte
     // wenn ein Snapshot mehrfach verwendet wird.
     $insertPhase = $db->prepare(
-        'INSERT INTO phasen (name, farbe, reihenfolge) VALUES (:name, :farbe, :r)'
+        'INSERT INTO phasen (name, farbe, reihenfolge, quelle) VALUES (:name, :farbe, :r, "prozess")'
     );
     $insertVorlage = $db->prepare(
         'INSERT INTO schritt_vorlagen (phase_id, reihenfolge, titel, beschreibung, kann_parallel)

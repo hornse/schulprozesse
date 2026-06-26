@@ -62,3 +62,7 @@ CREATE TABLE IF NOT EXISTS instanz_phasen (
 
 CREATE INDEX IF NOT EXISTS idx_instanz_phasen_prozess
   ON instanz_phasen(prozess_id);
+
+-- Phase-Quelle: 'standard' = gehört zur globalen Standard-Vorlage,
+-- 'prozess' = wurde durch _instanzenAusSnapshot für einen Prozess erstellt
+ALTER TABLE phasen ADD COLUMN quelle TEXT NOT NULL DEFAULT 'standard';

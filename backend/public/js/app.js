@@ -215,7 +215,7 @@ async function aktualisiereFeld(id, feld, wert, quelle) {
 }
 
 async function neuerProzess(label, beschreibung, oeffentlich, setId) {
-  await api('/api/prozesse', { method: 'POST', body: { label, beschreibung, oeffentlich, set_id: setId || null } });
+  await api('/api/prozesse', { method: 'POST', body: { label, beschreibung, oeffentlich, aktiv: 1, set_id: setId || null } });
   await ladeAlles();
   await ladePublicDashboard();
   render();
@@ -2134,21 +2134,73 @@ function updateBrandText() {
 
 function renderProzesseBlock() {
   const block = document.createElement('div');
-  block.innerHTML = `
-    <h3 style="font-size:13px;color:var(--muted);">Prozesse</h3>
+  block.className = 'admin-section';
+
+  // Tabs: Aktiv / Archiv
+  let aktiverArchivTab = 'aktiv';
+  const tabLeiste = document.createElement('div');
+  tabLeiste.className = 'zeitstrahl-tabs';
+  tabLeiste.style.marginBottom = '12px';
+  tabLeiste.innerHTML = `
+    <button class="zt-tab aktiv" data-archiv-tab="aktiv">Aktive Prozesse</button>
+    <button class="zt-tab" data-archiv-tab="archiv">Archiv</button>`;
+
+  const inhalt = document.createElement('div');
+
+  async function zeigeArchivTab(id) {
+    aktiverArchivTab = id;
+    tabLeiste.querySelectorAll('.zt-tab').forEach((b) =>
+      b.classList.toggle('aktiv', b.dataset.archivTab === id));
+    inhalt.innerHTML = '';
+    if (id === 'aktiv') {
+      inhalt.appendChild(renderAktiveProzesse());
+    } else {
+      // Archivierte Prozesse laden
+      const archiviert = await api('/api/prozesse?mit_archiv=1')
+        .then((rows) => rows.filter((p) => !p.aktiv));
+      inhalt.appendChild(renderArchivProzesse(archiviert));
+    }
+  }
+
+  tabLeiste.querySelectorAll('[data-archiv-tab]').forEach((btn) =>
+    btn.addEventListener('click', () => zeigeArchivTab(btn.dataset.archivTab)));
+
+  block.innerHTML = '<h3>Prozesse</h3>';
+  block.appendChild(tabLeiste);
+  block.appendChild(inhalt);
+  zeigeArchivTab('aktiv');
+  return block;
+}
+
+function renderAktiveProzesse() {
+  const wrapper = document.createElement('div');
+
+  // Prozess-Tabelle
+  const tabelleHtml = STATE.prozesse.map((p) => `
+    <tr>
+      <td>${p.label}${p.beschreibung
+        ? `<span style="font-size:11px;color:var(--muted);margin-left:6px;">${p.beschreibung}</span>`
+        : ''}</td>
+      <td>${p.oeffentlich ? '🌐' : '🔒'}</td>
+      <td>${p.erledigt_anzahl ?? 0}/${p.schritt_anzahl ?? 0}</td>
+      <td>${p.teilnehmer_anzahl ?? 0}</td>
+      <td>
+        <button class="btn-sekundaer btn" data-archivieren="${p.id}"
+                style="width:auto;font-size:11px;padding:3px 8px;">
+          📦 archivieren
+        </button>
+      </td>
+    </tr>`).join('');
+
+  wrapper.innerHTML = `
     <table class="admin-tabelle">
-      <thead><tr><th>Name</th><th>Öffentlich</th><th>Schritte</th><th>Teilnehmer</th></tr></thead>
-      <tbody>
-        ${STATE.prozesse.map((p) => `
-          <tr>
-            <td>${p.label}${p.beschreibung ? `<span style="font-size:11px;color:var(--muted);margin-left:6px;">${p.beschreibung}</span>` : ''}</td>
-            <td>${p.oeffentlich ? '🌐 öffentlich' : '🔒 privat'}</td>
-            <td>${p.erledigt_anzahl ?? 0}/${p.schritt_anzahl ?? 0}</td>
-            <td>${p.teilnehmer_anzahl ?? 0}</td>
-          </tr>`).join('')}
-      </tbody>
+      <thead><tr>
+        <th>Name</th><th>Sichtb.</th><th>Schritte</th>
+        <th>Teiln.</th><th></th>
+      </tr></thead>
+      <tbody>${tabelleHtml}</tbody>
     </table>
-    <h3 class="">Neuen Prozess anlegen</h3>
+    <h3 style="margin-top:20px;">Neuen Prozess anlegen</h3>
     <form class="inline-form" id="neuer-prozess-form">
       <div class="feld" style="flex:1;"><label>Name</label>
         <input type="text" id="prozess-label" placeholder="z. B. Abitur 2027" required style="width:100%;"></div>
@@ -2170,17 +2222,22 @@ function renderProzesseBlock() {
       <button class="btn" type="submit" style="width:auto;">Anlegen</button>
     </form>
 
-    <h3 class="">Gespeicherte Vorlagen (Snapshots)</h3>
+    <h3 style="margin-top:20px;">Gespeicherte Vorlagen (Snapshots)</h3>
     <div>
       ${STATE.vorlagenSets.length === 0
         ? '<p style="font-size:12px;color:var(--muted);">Noch keine Snapshots.</p>'
         : STATE.vorlagenSets.map((s) => `
           <div class="vorlagen-set-zeile">
             <div><strong>${s.name}</strong>
-              ${s.beschreibung ? `<span style="font-size:11px;color:var(--muted);margin-left:6px;">${s.beschreibung}</span>` : ''}
-              <span style="font-size:11px;color:var(--muted);margin-left:6px;">· ${s.schritt_anzahl} Schritte · ${s.erstellt_von} · ${s.erstellt_am?.slice(0,10)}</span>
+              ${s.beschreibung
+                ? `<span style="font-size:11px;color:var(--muted);margin-left:6px;">${s.beschreibung}</span>`
+                : ''}
+              <span style="font-size:11px;color:var(--muted);margin-left:6px;">
+                · ${s.schritt_anzahl} Schritte · ${s.erstellt_von} · ${s.erstellt_am?.slice(0,10)}
+              </span>
             </div>
-            <button class="btn-sekundaer btn btn-loeschen" data-loeschen-set="${s.id}" style="width:auto;color:#c0392b;border-color:#c0392b;">löschen</button>
+            <button class="btn-sekundaer btn btn-gefahr" data-loeschen-set="${s.id}"
+                    style="width:auto;">löschen</button>
           </div>`).join('')}
     </div>
     <form class="inline-form" id="neuer-snapshot-form" style="margin-top:10px;">
@@ -2191,30 +2248,87 @@ function renderProzesseBlock() {
       <button class="btn" type="submit" style="width:auto;">Jetzt einfrieren</button>
     </form>`;
 
-  block.querySelector('#neuer-prozess-form').addEventListener('submit', (e) => {
+  wrapper.querySelector('#neuer-prozess-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const label = block.querySelector('#prozess-label').value.trim();
-    const beschreibung = block.querySelector('#prozess-beschreibung').value.trim() || null;
-    const setId = block.querySelector('#prozess-set').value;
-    const setIdWert = setId === '' ? null : setId === 'leer' ? 'leer' : Number(setId);
-    const oeffentlich = Number(block.querySelector('#prozess-oeffentlich').value);
+    const label        = wrapper.querySelector('#prozess-label').value.trim();
+    const beschreibung = wrapper.querySelector('#prozess-beschreibung').value.trim() || null;
+    const setId        = wrapper.querySelector('#prozess-set').value;
+    const setIdWert    = setId === '' ? null : setId === 'leer' ? 'leer' : Number(setId);
+    const oeffentlich  = Number(wrapper.querySelector('#prozess-oeffentlich').value);
     if (label) neuerProzess(label, beschreibung, oeffentlich, setIdWert);
   });
-  block.querySelector('#neuer-snapshot-form').addEventListener('submit', (e) => {
+  wrapper.querySelector('#neuer-snapshot-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const name = block.querySelector('#snapshot-name').value.trim();
-    const beschreibung = block.querySelector('#snapshot-beschreibung').value.trim() || null;
+    const name         = wrapper.querySelector('#snapshot-name').value.trim();
+    const beschreibung = wrapper.querySelector('#snapshot-beschreibung').value.trim() || null;
     if (name) speichereVorlagenSet(name, beschreibung);
   });
-  block.querySelectorAll('[data-loeschen-set]').forEach((btn) => {
+  wrapper.querySelectorAll('[data-loeschen-set]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const s = STATE.vorlagenSets.find((x) => x.id === Number(btn.dataset.loeschenSet));
       if (confirm(`Snapshot „${s?.name}" wirklich löschen?`)) {
-        try { await loescheVorlagenSet(Number(btn.dataset.loeschenSet)); } catch (err) { alert(err.message); }
+        try { await loescheVorlagenSet(Number(btn.dataset.loeschenSet)); }
+        catch (err) { alert(err.message); }
       }
     });
   });
-  return block;
+  wrapper.querySelectorAll('[data-archivieren]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const p = STATE.prozesse.find((x) => x.id === Number(btn.dataset.archivieren));
+      if (!confirm(`„${p?.label}" archivieren?\n\nDer Prozess wird aus den Tabs entfernt und kann jederzeit reaktiviert werden.`)) return;
+      try {
+        await api(`/api/prozesse/${p.id}/archivieren`, { method: 'POST' });
+        await ladeAlles();
+        render();
+      } catch (err) { alert(err.message); }
+    });
+  });
+  return wrapper;
+}
+
+function renderArchivProzesse(archiviert) {
+  const wrapper = document.createElement('div');
+  if (archiviert.length === 0) {
+    wrapper.innerHTML = '<p style="font-size:12px;color:var(--muted);padding:12px 0;">Keine archivierten Prozesse.</p>';
+    return wrapper;
+  }
+  const tabelleHtml = archiviert.map((p) => `
+    <tr>
+      <td>${p.label}${p.beschreibung
+        ? `<span style="font-size:11px;color:var(--muted);margin-left:6px;">${p.beschreibung}</span>`
+        : ''}</td>
+      <td>${p.erledigt_anzahl ?? 0}/${p.schritt_anzahl ?? 0}</td>
+      <td style="color:var(--muted);font-size:11px;">${p.erstellt_am?.slice(0,10) ?? ''}</td>
+      <td>
+        <button class="btn" data-reaktivieren="${p.id}"
+                style="width:auto;font-size:11px;padding:3px 8px;">
+          ↩ reaktivieren
+        </button>
+      </td>
+    </tr>`).join('');
+
+  wrapper.innerHTML = `
+    <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+      Archivierte Prozesse erscheinen nicht in den Tabs und sind für normale
+      Nutzer nicht sichtbar. Sie können jederzeit reaktiviert werden.
+    </p>
+    <table class="admin-tabelle">
+      <thead><tr>
+        <th>Name</th><th>Fortschritt</th><th>Archiviert</th><th></th>
+      </tr></thead>
+      <tbody>${tabelleHtml}</tbody>
+    </table>`;
+
+  wrapper.querySelectorAll('[data-reaktivieren]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await api(`/api/prozesse/${btn.dataset.reaktivieren}/reaktivieren`, { method: 'POST' });
+        await ladeAlles();
+        render();
+      } catch (err) { alert(err.message); }
+    });
+  });
+  return wrapper;
 }
 
 function renderZugriffBlock() {

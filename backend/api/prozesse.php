@@ -21,26 +21,32 @@ use App\Response;
 function handleListProzesse(PDO $db, array $config, array $input): void
 {
     $user = Guard::requireLogin($db);
+    // mit_archiv=1 liefert auch archivierte Prozesse (nur Admin-Archiv-Ansicht)
+    $mitArchiv   = !empty($input['mit_archiv']);
+    $aktivFilter = $mitArchiv ? '' : 'AND p.aktiv = 1';
 
     if ($user['rolle'] === 'admin') {
         $rows = $db->query(
-            'SELECT p.*, 
+            "SELECT p.*,
                     (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id) as schritt_anzahl,
                     (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1) as erledigt_anzahl,
                     (SELECT COUNT(*) FROM prozess_teilnehmer pt WHERE pt.prozess_id = p.id) as teilnehmer_anzahl,
-                    "admin" as meine_rolle
-        FROM prozesse p ORDER BY p.erstellt_am DESC'
+                    'admin' as meine_rolle
+             FROM prozesse p
+             WHERE 1=1 $aktivFilter
+             ORDER BY p.erstellt_am DESC"
         )->fetchAll();
     } else {
         $stmt = $db->prepare(
-            'SELECT p.*,
+            "SELECT p.*,
                     (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id) as schritt_anzahl,
                     (SELECT COUNT(*) FROM schritt_instanzen si WHERE si.prozess_id = p.id AND si.erledigt = 1) as erledigt_anzahl,
                     (SELECT COUNT(*) FROM prozess_teilnehmer pt WHERE pt.prozess_id = p.id) as teilnehmer_anzahl,
                     pt.rolle as meine_rolle
              FROM prozesse p
              JOIN prozess_teilnehmer pt ON pt.prozess_id = p.id AND pt.webuntis_user = :u
-             ORDER BY p.erstellt_am DESC'
+             WHERE 1=1 $aktivFilter
+             ORDER BY p.erstellt_am DESC"
         );
         $stmt->execute([':u' => $user['webuntis_user']]);
         $rows = $stmt->fetchAll();
@@ -269,4 +275,20 @@ function _instanzenAusSnapshot(PDO $db, int $prozessId, int $setId): void
             $insertInstanz->execute([':p' => $prozessId, ':v' => $vorlageId, ':kp' => $ss['kann_parallel']]);
         }
     }
+}
+
+function handleArchivierenProzess(PDO $db, array $config, array $input, array $params): void
+{
+    Guard::requireAdmin($db);
+    $id = (int) $params['id'];
+    $db->prepare('UPDATE prozesse SET aktiv = 0 WHERE id = :id')->execute([':id' => $id]);
+    Response::json(['ok' => true]);
+}
+
+function handleReaktivierenProzess(PDO $db, array $config, array $input, array $params): void
+{
+    Guard::requireAdmin($db);
+    $id = (int) $params['id'];
+    $db->prepare('UPDATE prozesse SET aktiv = 1 WHERE id = :id')->execute([':id' => $id]);
+    Response::json(['ok' => true]);
 }

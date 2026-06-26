@@ -78,6 +78,8 @@ $routes = [
     ['GET',    '#^api/prozesse$#',                                       'handleListProzesse'],
     ['POST',   '#^api/prozesse$#',                                       'handleCreateProzess'],
     ['PATCH',  '#^api/prozesse/(?P<id>\d+)$#',                           'handleUpdateProzess'],
+    ['POST',   '#^api/prozesse/(?P<id>\d+)/archivieren$#',               'handleArchivierenProzess'],
+    ['POST',   '#^api/prozesse/(?P<id>\d+)/reaktivieren$#',              'handleReaktivierenProzess'],
     ['POST',   '#^api/prozesse/(?P<id>\d+)/aktivieren$#',                'handleActivateProzess'],
     ['GET',    '#^api/prozesse/(?P<id>\d+)/teilnehmer$#',                'handleListTeilnehmer'],
     ['POST',   '#^api/prozesse/(?P<id>\d+)/teilnehmer$#',               'handleUpsertTeilnehmer'],

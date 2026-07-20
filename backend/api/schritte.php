@@ -201,10 +201,13 @@ function handleUpdateSchritt(PDO $db, array $config, array $input, array $params
 // erscheinen – ohne die globale Vorlage zu berühren.
 // ============================================================================
 
-function handleListInstanzSchritte(PDO $db, array $config, array $input): void
+function handleListInstanzSchritte(PDO $db, array $config, array $input, array $params): void
 {
     $user      = Guard::requireLogin($db);
-    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
+    // prozess_id kann als URL-Parameter (/api/prozesse/{id}/instanz-schritte)
+    // oder als Query-Parameter (?prozess_id=X) kommen
+    $prozessId = isset($params['prozess_id']) ? (int) $params['prozess_id']
+               : (isset($input['prozess_id'])  ? (int) $input['prozess_id'] : null);
     if (!$prozessId) Response::error('prozess_id erforderlich.', 400);
 
     Guard::requireProzessZugriff($db, $prozessId);

@@ -1571,10 +1571,19 @@ function renderInstanzSchrittVerwaltung() {
               await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
             }
           } else {
-            await api(
-              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
-              { method: 'DELETE' }
-            );
+            if (!phaseIdFallback) {
+              alert('Fehler: Phase-ID nicht gefunden. Bitte Seite neu laden.');
+              return;
+            }
+            try {
+              await api(
+                `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+                { method: 'DELETE' }
+              );
+            } catch (err) {
+              alert('Fehler beim Zurücksetzen: ' + err.message);
+              return;
+            }
           }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
@@ -1589,6 +1598,44 @@ function renderInstanzSchrittVerwaltung() {
         const schrittListe = document.createElement('div');
         schrittListe.className = 'vorlagen-liste';
         phaseBlock.appendChild(schrittListe);
+
+        // Neuen eigenen Schritt zu dieser Vorlage-Phase hinzufügen
+        const addReihe = document.createElement('div');
+        addReihe.style.cssText = 'display:flex;gap:8px;margin:6px 8px 10px;';
+        const addInput = document.createElement('input');
+        addInput.type = 'text';
+        addInput.placeholder = 'Weiterer Schritt für diesen Prozess...';
+        addInput.style.cssText = 'flex:1;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;';
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn';
+        addBtn.style.cssText = 'width:auto;';
+        addBtn.textContent = '+';
+        const doAdd = async () => {
+          const titel = addInput.value.trim();
+          if (!titel) return;
+          addBtn.disabled = true;
+          try {
+            await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
+              method: 'POST',
+              body: { titel, phase_name: s.phase, phase_farbe: s.phase_farbe }
+            });
+            const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
+            STATE.schritte = res.schritte;
+            block.replaceWith(renderInstanzSchrittVerwaltung());
+          } catch (err) {
+            alert('Fehler: ' + err.message);
+            addBtn.disabled = false;
+          }
+        };
+        addBtn.addEventListener('click', doAdd);
+        addInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+        });
+        addReihe.appendChild(addInput);
+        addReihe.appendChild(addBtn);
+        phaseBlock.appendChild(addReihe);
+
         liste.appendChild(phaseBlock);
         return { phaseBlock, schrittListe };
       }

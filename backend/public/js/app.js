@@ -47,6 +47,13 @@ async function api(path, { method = 'GET', body } = {}) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    // Session abgelaufen – zur Login-Seite
+    STATE.user = null;
+    STATE.ansicht = 'login';
+    render();
+    throw new Error('Sitzung abgelaufen. Bitte neu anmelden.');
+  }
   if (!res.ok) throw new Error(data.error || `Fehler (${res.status})`);
   return data;
 }
@@ -1633,16 +1640,17 @@ function renderInstanzSchrittVerwaltung() {
           }
           addBtn.disabled = true;
           try {
-            // Neuer Schritt als schritt_vorlage + schritt_instanz nur für diesen Prozess
-            // (nicht als instanz_schritt – das würde eine doppelte Phase erzeugen)
-            await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`, {
+            console.log('doAdd: calling API', `/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`);
+            const result = await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`, {
               method: 'POST',
               body: { titel }
             });
+            console.log('doAdd: API result', result);
             const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
             STATE.schritte = res.schritte;
             render();
           } catch (err) {
+            console.error('doAdd error:', err);
             alert('Fehler: ' + err.message);
             addBtn.disabled = false;
           }

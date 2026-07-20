@@ -13,6 +13,34 @@ Geplant:
 
 ---
 
+## [2.2.1] – 2026-07-20
+
+### Hinzugefügt
+- **Schritte zu bestehenden Vorlage-Phasen hinzufügen** – unter „Prozess
+  verwalten → Schritte anpassen" hat jede Vorlage-Phase jetzt ein
+  „Weiterer Schritt für diesen Prozess..."-Eingabefeld mit `+`-Button;
+  der neue Schritt wird als `schritt_vorlage` + `schritt_instanz` nur
+  für diesen Prozess angelegt – keine doppelte Phase, kein `instanz_schritt`
+- **Schritte zu bestehenden eigenen Phasen hinzufügen** – auch eigene
+  Phasen (unterer Bereich) haben jetzt ein Eingabefeld zum Ergänzen
+  weiterer Schritte
+
+### Behoben
+- **Zurücksetzen-Button** – gibt jetzt eine sichtbare Fehlermeldung aus
+  wenn `phase_id` nicht gefunden wird; `istEigenPhase` wird jetzt korrekt
+  über `quelle === 'eigen'` statt nur über das Fehlen der `phase_id`
+  bestimmt
+- **Re-render nach Änderungen** – `block.replaceWith(renderInstanzSchrittVerwaltung())`
+  durch `render()` ersetzt; der alte Ansatz renderte synchron bevor async
+  Daten geladen waren, was zu leerem/unverändertem DOM führte
+- **Neue Schritte erzeugten doppelte Phase** – `instanz_schritte` mit
+  gleichem Phasennamen wie Vorlage-Phase erzeugte eine zweite identisch
+  benannte Phase in der Checkliste; neuer Endpunkt
+  `POST /api/prozesse/{id}/phasen/{phase_id}/schritte` legt Schritte
+  korrekt in der bestehenden Phase an
+
+---
+
 ## [2.2.0] – 2026-06-26
 
 ### Hinzugefügt

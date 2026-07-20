@@ -39,6 +39,8 @@ Analog zur OOP:
 - Phasennamen und -farben für jeden Prozess individuell überschreiben
 - Schritte umbenennen (Original bleibt als Hinweis sichtbar)
 - Schritte deaktivieren und reaktivieren
+- Schritte duplizieren (phasenübergreifend)
+- Neue Schritte zu bestehenden Vorlage-Phasen hinzufügen (nur für diesen Prozess)
 - Eigene Phasen und Schritte hinzufügen die nur in diesem Prozess erscheinen
 
 **Zeitstrahl:**

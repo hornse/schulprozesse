@@ -3298,12 +3298,16 @@ function renderHandbuch(schulname) {
         Änderungen betreffen nur diesen Prozess. „↺ zurücksetzen" setzt Phase auf
         Vorlage-Standard zurück.<br>
         Pro Schritt: Titel umbenennen (Original bleibt als Hinweis sichtbar),
-        „✕ ausblenden" / „↩ reaktivieren".</p>
+        „✕ ausblenden" / „↩ reaktivieren", ⎘ duplizieren.<br>
+        Mit dem „+ Weiterer Schritt"-Feld am Ende jeder Phase können neue Schritte
+        direkt zu dieser Phase hinzugefügt werden – sie erscheinen nur in diesem
+        Prozess und nicht in anderen.</p>
 
         <p><strong>Schritte anpassen – Eigene Phasen:</strong><br>
         Phasenname + Farbe eingeben, Schritte hinzufügen (Enter oder + Schritt),
         „💾 Phase mit Schritten speichern". Bestehende eigene Phasen sind direkt
-        editierbar.</p>
+        editierbar und können nachträglich mit dem „+"-Feld um weitere Schritte
+        ergänzt werden.</p>
 
         <p><strong>Aktivitätsprotokoll:</strong> Letzte 200 Aktionen, CSV-Export.</p>`,
     },

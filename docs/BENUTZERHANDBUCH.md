@@ -79,17 +79,20 @@ Jede Vorlage-Phase hat einen editierbaren Kopf (Farbwähler + Namensfeld).
 - Name ändern → Enter oder Feld verlassen zum Speichern
 - „↺ zurücksetzen" → Phase auf Vorlage-Standard zurücksetzen
   (Schritt-Umbenennungen bleiben erhalten)
+- „+ Weiterer Schritt" → neuer Schritt direkt in dieser Phase,
+  erscheint nur in diesem Prozess
 
 Pro Schritt:
 - Titel umbenennen (Original bleibt als „← Originalname" sichtbar)
 - „✕ ausblenden" / „↩ reaktivieren"
+- ⎘ duplizieren
 
 **Eigene Phasen und Schritte:**
 - Phasenname eingeben, Farbe wählen
 - Schritte zur Phase hinzufügen (Enter oder + Schritt)
 - „💾 Phase mit Schritten speichern"
 - Bestehende eigene Phasen: Name und Farbe direkt editierbar,
-  Schritte umbenennbar und löschbar
+  Schritte umbenennbar, löschbar und nachträglich ergänzbar
 
 ### Aktivitätsprotokoll
 Letzte 200 Aktionen dieses Prozesses, als CSV exportierbar.

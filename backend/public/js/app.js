@@ -1452,12 +1452,24 @@ function renderInstanzSchrittVerwaltung() {
   liste.className = 'instanz-schritte-liste';
   block.appendChild(liste);
 
+  // STATE.schritte hat bereits alle Vorlage-Schritte mit phase_id
+  // Wir verwenden das direkt statt eines separaten async Fetch
+  const alleVorlagen = STATE.schritte.filter((s) => s.quelle !== 'eigen');
+  const alleInklusiveDeaktiviert = alleVorlagen; // STATE enthält nur aktive; für Verwaltung auch deaktivierte laden
+
   ladeProzessSchritteMitDeaktivierten(STATE.prozessId).then((alle) => {
-    if (alle.length === 0) {
+    // Nur Vorlage-Schritte (nicht eigene)
+    const nurVorlagen = alle.filter((s) => s.quelle !== 'eigen');
+    if (nurVorlagen.length === 0) {
       liste.innerHTML = '<p style="font-size:12px;color:var(--muted);">Keine Vorlage-Schritte vorhanden.</p>';
-    } else {
-      // Phasen-Blöcke mit editierbarem Kopf (Name + Farbe)
-      // phase_id kommt aus dem JOIN auf phasen in handleListSchritte
+      return;
+    }
+
+    // phase_id aus STATE.schritte holen (zuverlässiger als aus alle=1 Response)
+    function getPhaseId(phaseName) {
+      const gefunden = STATE.schritte.find((sc) => sc.phase === phaseName && sc.phase_id);
+      return gefunden?.phase_id ?? null;
+    }
       let aktuellePhase = null;
       let aktuellerPhaseBlock = null;
       let aktuelleSchrittListe = null;
@@ -1471,20 +1483,19 @@ function renderInstanzSchrittVerwaltung() {
         const kopf = document.createElement('div');
         kopf.className = 'phasen-kopf';
 
-        // Farb-Button mit Popup
+        // phase_id zuverlässig aus STATE.schritte holen
+        const phaseId = getPhaseId(s.phase);
+        const istEigenPhase = (s.quelle === 'eigen') || !phaseId;
+
         let aktFarbe = s.phase_farbe;
+
+        // Farb-Button mit Popup
         const farbBtn = document.createElement('button');
         farbBtn.type = 'button';
         farbBtn.style.cssText = `background:${aktFarbe};width:22px;height:22px;border-radius:4px;border:2px solid rgba(0,0,0,.15);cursor:pointer;flex-shrink:0;`;
         const farbPopup = document.createElement('div');
         farbPopup.className = 'farb-popup';
         farbPopup.style.display = 'none';
-        // phase_id direkt aus dem Schritt nehmen (nur bei Vorlage-Schritten vorhanden)
-        // phase_id zuverlässig aus STATE.schritte holen (normaler Response hat phase_id immer)
-        const phaseIdFallback = s.phase_id
-          ?? STATE.schritte.find((sc) => sc.phase === s.phase && sc.phase_id)?.phase_id
-          ?? STATE.schritte.find((sc) => sc.phase === s.phase)?.phase_id;
-        const istEigenPhase = (s.quelle === 'eigen') || !phaseIdFallback;
 
         farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
           aktFarbe = f;
@@ -1503,7 +1514,7 @@ function renderInstanzSchrittVerwaltung() {
           } else {
             // Vorlage-Phase: instanz_phasen API
             await api(
-              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
               { method: 'POST', body: { instanz_farbe: f } }
             );
           }
@@ -1542,7 +1553,7 @@ function renderInstanzSchrittVerwaltung() {
             }
           } else {
             await api(
-              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
               { method: 'POST', body: { instanz_name: neuerName } }
             );
           }
@@ -1562,7 +1573,7 @@ function renderInstanzSchrittVerwaltung() {
           ? 'Alle Schritte dieser Phase löschen'
           : 'Auf Vorlage-Standard zurücksetzen';
         resetBtn.addEventListener('click', async () => {
-          console.log('resetBtn: phaseIdFallback=', phaseIdFallback, 'istEigenPhase=', istEigenPhase);
+          console.log('resetBtn: phaseId=', phaseId, 'istEigenPhase=', istEigenPhase);
           if (istEigenPhase) {
             const schritteDieserPhase = alle.filter(
               (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
@@ -1572,13 +1583,13 @@ function renderInstanzSchrittVerwaltung() {
               await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
             }
           } else {
-            if (!phaseIdFallback) {
+            if (!phaseId) {
               alert('Fehler: Phase-ID nicht gefunden. Bitte Seite neu laden.');
               return;
             }
             try {
               await api(
-                `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseIdFallback}`,
+                `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
                 { method: 'DELETE' }
               );
             } catch (err) {
@@ -1615,8 +1626,8 @@ function renderInstanzSchrittVerwaltung() {
         const doAdd = async () => {
           const titel = addInput.value.trim();
           if (!titel) return;
-          console.log('doAdd: phaseIdFallback=', phaseIdFallback, 'istEigenPhase=', istEigenPhase, 's.phase_id=', s.phase_id);
-          if (!phaseIdFallback) {
+          console.log('doAdd: phaseId=', phaseId, 'istEigenPhase=', istEigenPhase, 's.phase_id=', s.phase_id);
+          if (!phaseId) {
             alert('Fehler: phase_id nicht gefunden (' + s.phase + '). Bitte Seite neu laden.');
             return;
           }
@@ -1624,7 +1635,7 @@ function renderInstanzSchrittVerwaltung() {
           try {
             // Neuer Schritt als schritt_vorlage + schritt_instanz nur für diesen Prozess
             // (nicht als instanz_schritt – das würde eine doppelte Phase erzeugen)
-            await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseIdFallback}/schritte`, {
+            await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`, {
               method: 'POST',
               body: { titel }
             });
@@ -1648,7 +1659,7 @@ function renderInstanzSchrittVerwaltung() {
         return { phaseBlock, schrittListe };
       }
 
-      alle.forEach((s) => {
+      nurVorlagen.forEach((s) => {
         if (s.phase !== aktuellePhase) {
           aktuellePhase = s.phase;
           const { phaseBlock, schrittListe } = neuerPhaseBlock(s);
@@ -1754,7 +1765,6 @@ function renderInstanzSchrittVerwaltung() {
         });
         aktuelleSchrittListe.appendChild(zeile);
       });
-    }
   });
 
   // ---- Teil 2: Eigene Phasen und Schritte ----

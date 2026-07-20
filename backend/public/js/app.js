@@ -1562,6 +1562,7 @@ function renderInstanzSchrittVerwaltung() {
           ? 'Alle Schritte dieser Phase löschen'
           : 'Auf Vorlage-Standard zurücksetzen';
         resetBtn.addEventListener('click', async () => {
+          console.log('resetBtn: phaseIdFallback=', phaseIdFallback, 'istEigenPhase=', istEigenPhase);
           if (istEigenPhase) {
             const schritteDieserPhase = alle.filter(
               (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
@@ -1614,6 +1615,11 @@ function renderInstanzSchrittVerwaltung() {
         const doAdd = async () => {
           const titel = addInput.value.trim();
           if (!titel) return;
+          console.log('doAdd: phaseIdFallback=', phaseIdFallback, 'istEigenPhase=', istEigenPhase, 's.phase_id=', s.phase_id);
+          if (!phaseIdFallback) {
+            alert('Fehler: phase_id nicht gefunden (' + s.phase + '). Bitte Seite neu laden.');
+            return;
+          }
           addBtn.disabled = true;
           try {
             // Neuer Schritt als schritt_vorlage + schritt_instanz nur für diesen Prozess

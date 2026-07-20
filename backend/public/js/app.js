@@ -1459,25 +1459,22 @@ function renderInstanzSchrittVerwaltung() {
   liste.className = 'instanz-schritte-liste';
   block.appendChild(liste);
 
-  // STATE.schritte hat bereits alle Vorlage-Schritte mit phase_id
-  // Wir verwenden das direkt statt eines separaten async Fetch
-  const alleVorlagen = STATE.schritte.filter((s) => s.quelle !== 'eigen');
-  const alleInklusiveDeaktiviert = alleVorlagen; // STATE enthält nur aktive; für Verwaltung auch deaktivierte laden
-
-  ladeProzessSchritteMitDeaktivierten(STATE.prozessId).then((alle) => {
-    // Nur Vorlage-Schritte (nicht eigene)
-    const nurVorlagen = alle.filter((s) => s.quelle !== 'eigen');
+  // STATE.schritte direkt verwenden (bereits aktuell nach ladeAlles/render)
+  // Für deaktivierte Schritte zusätzlich laden
+  const renderVorlagenSchritte = (nurVorlagen) => {
+    liste.innerHTML = '';
     if (nurVorlagen.length === 0) {
       liste.innerHTML = '<p style="font-size:12px;color:var(--muted);">Keine Vorlage-Schritte vorhanden.</p>';
       return;
     }
 
-    // phase_id aus STATE.schritte holen (zuverlässiger als aus alle=1 Response)
+    // phase_id aus nurVorlagen selbst holen (zuverlässig)
     function getPhaseId(phaseName) {
-      const gefunden = STATE.schritte.find((sc) => sc.phase === phaseName && sc.phase_id);
+      const gefunden = nurVorlagen.find((sc) => sc.phase === phaseName && sc.phase_id);
       return gefunden?.phase_id ?? null;
     }
-      let aktuellePhase = null;
+
+    let aktuellePhase = null;
       let aktuellerPhaseBlock = null;
       let aktuelleSchrittListe = null;
 
@@ -1773,6 +1770,18 @@ function renderInstanzSchrittVerwaltung() {
         });
         aktuelleSchrittListe.appendChild(zeile);
       });
+  }; // Ende renderVorlagenSchritte
+
+  // Sofort mit STATE.schritte rendern (synchron, keine Wartezeit)
+  const aktuelleVorlagen = STATE.schritte.filter((s) => s.quelle !== 'eigen');
+  renderVorlagenSchritte(aktuelleVorlagen);
+
+  // Zusätzlich deaktivierte Schritte nachladen und neu rendern
+  ladeProzessSchritteMitDeaktivierten(STATE.prozessId).then((alle) => {
+    const mitDeaktivierten = alle.filter((s) => s.quelle !== 'eigen');
+    if (mitDeaktivierten.length > aktuelleVorlagen.length) {
+      renderVorlagenSchritte(mitDeaktivierten);
+    }
   });
 
   // ---- Teil 2: Eigene Phasen und Schritte ----

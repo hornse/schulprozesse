@@ -1587,7 +1587,7 @@ function renderInstanzSchrittVerwaltung() {
           }
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          block.replaceWith(renderInstanzSchrittVerwaltung());
+          render();
         });
 
         kopf.appendChild(farbWrap);
@@ -1622,7 +1622,7 @@ function renderInstanzSchrittVerwaltung() {
             });
             const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
             STATE.schritte = res.schritte;
-            block.replaceWith(renderInstanzSchrittVerwaltung());
+            render();
           } catch (err) {
             alert('Fehler: ' + err.message);
             addBtn.disabled = false;
@@ -1728,7 +1728,7 @@ function renderInstanzSchrittVerwaltung() {
             });
             const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
             STATE.schritte = res.schritte;
-            block.replaceWith(renderInstanzSchrittVerwaltung());
+            render();
           } catch (err) { alert('Fehler: ' + err.message); }
         });
 
@@ -1830,7 +1830,7 @@ function renderInstanzSchrittVerwaltung() {
             method: 'PATCH', body: { phase_name: neuerName }
           });
         }
-        block.replaceWith(renderInstanzSchrittVerwaltung());
+        render();
       });
 
       kopf.appendChild(farbWrap);
@@ -1860,7 +1860,7 @@ function renderInstanzSchrittVerwaltung() {
           await api(`/api/instanz-schritte/${s.id}`, { method: 'DELETE' });
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          block.replaceWith(renderInstanzSchrittVerwaltung());
+          render();
         });
         schrittListe.appendChild(zeile);
       });
@@ -1889,7 +1889,7 @@ function renderInstanzSchrittVerwaltung() {
           });
           const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
           STATE.schritte = res.schritte;
-          block.replaceWith(renderInstanzSchrittVerwaltung());
+          render();
         } catch (err) {
           alert('Fehler: ' + err.message);
           addBtn.disabled = false;
@@ -1998,7 +1998,7 @@ function renderInstanzSchrittVerwaltung() {
       }
       const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
       STATE.schritte = res.schritte;
-      block.replaceWith(renderInstanzSchrittVerwaltung());
+      render();
     } catch (err) {
       alert('Fehler beim Speichern: ' + err.message);
       speichernBtn.disabled = false;

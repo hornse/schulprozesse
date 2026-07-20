@@ -192,3 +192,50 @@ function handleReihenfolgeVorlagen(PDO $db, array $config, array $input): void
 
     Response::json(['ok' => true]);
 }
+
+/**
+ * Neuen Schritt zu einer Vorlage-Phase hinzufügen, aber nur für einen
+ * bestimmten Prozess als Instanz anlegen (nicht für alle Prozesse).
+ * POST /api/prozesse/{prozess_id}/phasen/{phase_id}/schritte
+ */
+function handleCreateVorlageFuerProzess(PDO $db, array $config, array $input, array $params): void
+{
+    $user      = Guard::requireLogin($db);
+    $prozessId = (int) $params['prozess_id'];
+    $phaseId   = (int) $params['phase_id'];
+
+    // Nur Verantwortliche und Admins
+    Guard::requireProzessVerantwortlich($db, $prozessId);
+
+    $titel = trim((string) ($input['titel'] ?? ''));
+    if ($titel === '') Response::error('titel ist erforderlich.', 400);
+
+    // Phase prüfen
+    $phase = $db->prepare('SELECT id FROM phasen WHERE id = :id');
+    $phase->execute([':id' => $phaseId]);
+    if (!$phase->fetch()) Response::error('Phase nicht gefunden.', 404);
+
+    // Neuen Vorlage-Schritt anlegen
+    $maxR = (int) $db->query(
+        "SELECT COALESCE(MAX(reihenfolge), 0) FROM schritt_vorlagen WHERE phase_id = $phaseId"
+    )->fetchColumn();
+
+    $db->prepare(
+        'INSERT INTO schritt_vorlagen (phase_id, reihenfolge, titel, beschreibung, kann_parallel)
+         VALUES (:phase_id, :r, :titel, :beschreibung, 0)'
+    )->execute([
+        ':phase_id'     => $phaseId,
+        ':r'            => $maxR + 1,
+        ':titel'        => $titel,
+        ':beschreibung' => $input['beschreibung'] ?? null,
+    ]);
+    $vorlageId = (int) $db->lastInsertId();
+
+    // Instanz NUR für diesen Prozess anlegen
+    $db->prepare(
+        'INSERT INTO schritt_instanzen (prozess_id, vorlage_id, kann_parallel)
+         VALUES (:p, :v, 0)'
+    )->execute([':p' => $prozessId, ':v' => $vorlageId]);
+
+    Response::json(['id' => $vorlageId, 'instanz' => true], 201);
+}

@@ -94,6 +94,7 @@ $routes = [
     ['POST',   '#^api/vorlagen$#',                                       'handleCreateVorlage'],
     ['PATCH',  '#^api/vorlagen/(?P<id>\d+)$#',                           'handleUpdateVorlage'],
     ['POST',   '#^api/vorlagen/reihenfolge$#',                           'handleReihenfolgeVorlagen'],
+    ['POST',   '#^api/prozesse/(?P<prozess_id>\d+)/phasen/(?P<phase_id>\d+)/schritte$#', 'handleCreateVorlageFuerProzess'],
 
     ['GET',    '#^api/phasen$#',                                         'handleListPhasen'],
     ['POST',   '#^api/phasen$#',                                         'handleCreatePhase'],

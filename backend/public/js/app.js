@@ -1616,9 +1616,11 @@ function renderInstanzSchrittVerwaltung() {
           if (!titel) return;
           addBtn.disabled = true;
           try {
-            await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
+            // Neuer Schritt als schritt_vorlage + schritt_instanz nur für diesen Prozess
+            // (nicht als instanz_schritt – das würde eine doppelte Phase erzeugen)
+            await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseIdFallback}/schritte`, {
               method: 'POST',
-              body: { titel, phase_name: s.phase, phase_farbe: s.phase_farbe }
+              body: { titel }
             });
             const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
             STATE.schritte = res.schritte;

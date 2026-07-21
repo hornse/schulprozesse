@@ -1446,6 +1446,9 @@ let instanzPhasenPuffer = {};
 
 function renderInstanzSchrittVerwaltung() {
   console.log('renderInstanzSchrittVerwaltung aufgerufen, prozessId=', STATE.prozessId);
+  const alleVorlagen = (STATE.schritteAlle || STATE.schritte).filter(s => s.quelle !== 'eigen');
+  const phasenImState = [...new Set(alleVorlagen.map(s => s.phase))];
+  console.log('Phasen in schritteAlle:', phasenImState);
   const block = document.createElement('div');
   block.className = 'admin-section';
 

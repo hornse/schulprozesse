@@ -78,6 +78,7 @@ async function doLogout() {
   STATE.prozesse = [];
   STATE.aktiverProzess = null;
   STATE.schritte = [];
+  STATE.schritteAlle = [];
   STATE.prozessId = null;
   STATE.teilnehmer = [];
   STATE.phasen = [];
@@ -156,8 +157,12 @@ async function ladeAlles() {
   }
 
   if (STATE.prozessId) {
-    const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-    STATE.schritte  = res.schritte;
+    const [res, resAlle] = await Promise.all([
+      api(`/api/schritte?prozess_id=${STATE.prozessId}`),
+      api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
+    ]);
+    STATE.schritte     = res.schritte;
+    STATE.schritteAlle = resAlle.schritte; // inkl. deaktivierter, für Verwaltungsansicht
 
     const teilRes = await api(`/api/prozesse/${STATE.prozessId}/teilnehmer`);
     STATE.teilnehmer = teilRes;
@@ -182,15 +187,18 @@ async function waehleProzess(id) {
   STATE.prozessId      = id;
   STATE.aktiverProzess = STATE.prozesse.find((p) => p.id === id);
   STATE.schritte       = [];
+  STATE.schritteAlle   = [];
   STATE.teilnehmer     = [];
   STATE.offeneSchritte = new Set();
 
-  const [schrittRes, teilRes] = await Promise.all([
+  const [schrittRes, schrittAlleRes, teilRes] = await Promise.all([
     api(`/api/schritte?prozess_id=${id}`),
+    api(`/api/schritte?prozess_id=${id}&alle=1`),
     api(`/api/prozesse/${id}/teilnehmer`),
   ]);
-  STATE.schritte   = schrittRes.schritte;
-  STATE.teilnehmer = teilRes;
+  STATE.schritte     = schrittRes.schritte;
+  STATE.schritteAlle = schrittAlleRes.schritte;
+  STATE.teilnehmer   = teilRes;
 
   render();
 }
@@ -1644,8 +1652,12 @@ function renderInstanzSchrittVerwaltung() {
               body: { titel }
             });
             console.log('doAdd: API result', result);
-            const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-            STATE.schritte = res.schritte;
+            const [res, resAlle] = await Promise.all([
+              api(`/api/schritte?prozess_id=${STATE.prozessId}`),
+              api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
+            ]);
+            STATE.schritte     = res.schritte;
+            STATE.schritteAlle = resAlle.schritte;
             render();
           } catch (err) {
             console.error('doAdd error:', err);
@@ -1773,11 +1785,11 @@ function renderInstanzSchrittVerwaltung() {
       });
   }; // Ende renderVorlagenSchritte
 
-  // Schritte inkl. deaktivierter laden, dann einmalig rendern
-  ladeProzessSchritteMitDeaktivierten(STATE.prozessId).then((alle) => {
-    const nurVorlagenMitDeaktivierten = alle.filter((s) => s.quelle !== 'eigen');
-    renderVorlagenSchritte(nurVorlagenMitDeaktivierten);
-  });
+  // STATE.schritteAlle enthält alle Schritte inkl. deaktivierter
+  // (wird beim Prozess-Wechsel synchron geladen)
+  const nurVorlagen = (STATE.schritteAlle || STATE.schritte)
+    .filter((s) => s.quelle !== 'eigen');
+  renderVorlagenSchritte(nurVorlagen);
 
   // ---- Teil 2: Eigene Phasen und Schritte ----
   const sep = document.createElement('hr');

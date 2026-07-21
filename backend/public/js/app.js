@@ -1437,6 +1437,7 @@ function renderProzessVerwaltungInhalt() {
 let instanzPhasenPuffer = {};
 
 function renderInstanzSchrittVerwaltung() {
+  console.log('renderInstanzSchrittVerwaltung aufgerufen, prozessId=', STATE.prozessId);
   const block = document.createElement('div');
   block.className = 'admin-section';
 
@@ -1772,16 +1773,10 @@ function renderInstanzSchrittVerwaltung() {
       });
   }; // Ende renderVorlagenSchritte
 
-  // Sofort mit STATE.schritte rendern (synchron, keine Wartezeit)
-  const aktuelleVorlagen = STATE.schritte.filter((s) => s.quelle !== 'eigen');
-  renderVorlagenSchritte(aktuelleVorlagen);
-
-  // Zusätzlich deaktivierte Schritte nachladen und neu rendern
+  // Schritte inkl. deaktivierter laden, dann einmalig rendern
   ladeProzessSchritteMitDeaktivierten(STATE.prozessId).then((alle) => {
-    const mitDeaktivierten = alle.filter((s) => s.quelle !== 'eigen');
-    if (mitDeaktivierten.length > aktuelleVorlagen.length) {
-      renderVorlagenSchritte(mitDeaktivierten);
-    }
+    const nurVorlagenMitDeaktivierten = alle.filter((s) => s.quelle !== 'eigen');
+    renderVorlagenSchritte(nurVorlagenMitDeaktivierten);
   });
 
   // ---- Teil 2: Eigene Phasen und Schritte ----

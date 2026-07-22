@@ -1585,25 +1585,51 @@ function renderInstanzSchrittVerwaltung() {
           aktualisierePhaseImDOM(s.phase, null, neuerName);
         });
 
-        // Zurücksetzen-Button (nur für Vorlage-Phasen sinnvoll)
-        const resetBtn = document.createElement('button');
-        resetBtn.type = 'button';
-        resetBtn.className = 'btn-sekundaer btn';
-        resetBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;margin-left:auto;flex-shrink:0;';
-        resetBtn.textContent = istEigenPhase ? '✕ Phase löschen' : '↺ zurücksetzen';
-        resetBtn.title = istEigenPhase
-          ? 'Alle Schritte dieser Phase löschen'
-          : 'Auf Vorlage-Standard zurücksetzen';
-        resetBtn.addEventListener('click', async () => {
-          if (istEigenPhase) {
-            const schritteDieserPhase = alle.filter(
+        // Zurücksetzen: zwei Stufen für Vorlage-Phasen, Löschen für eigene Phasen
+        const schritteReload = async () => {
+          const [res, resAlle] = await Promise.all([
+            api(`/api/schritte?prozess_id=${STATE.prozessId}`),
+            api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
+          ]);
+          STATE.schritte     = res.schritte;
+          STATE.schritteAlle = resAlle.schritte;
+          render();
+        };
+
+        const btnLeiste = document.createElement('span');
+        btnLeiste.style.cssText = 'display:flex;gap:4px;margin-left:auto;flex-shrink:0;';
+
+        if (istEigenPhase) {
+          const loeschBtn = document.createElement('button');
+          loeschBtn.type = 'button';
+          loeschBtn.className = 'btn-sekundaer btn btn-gefahr';
+          loeschBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
+          loeschBtn.textContent = '✕ Phase löschen';
+          loeschBtn.title = 'Diese eigene Phase mit allen Schritten löschen';
+          loeschBtn.addEventListener('click', async () => {
+            const schritteDieserPhase = nurVorlagen.filter(
               (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
             );
             if (!confirm(`Phase „${s.phase}" und ${schritteDieserPhase.length} Schritt(e) löschen?`)) return;
-            for (const sc of schritteDieserPhase) {
-              await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
+            try {
+              for (const sc of schritteDieserPhase) {
+                await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
+              }
+              await schritteReload();
+            } catch (err) {
+              alert('Fehler beim Löschen: ' + err.message);
             }
-          } else {
+          });
+          btnLeiste.appendChild(loeschBtn);
+        } else {
+          // Stufe 1 – nur Phasenname und -farbe
+          const resetPhaseBtn = document.createElement('button');
+          resetPhaseBtn.type = 'button';
+          resetPhaseBtn.className = 'btn-sekundaer btn';
+          resetPhaseBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
+          resetPhaseBtn.textContent = '↺ Phase';
+          resetPhaseBtn.title = 'Nur Phasenname und -farbe auf Vorlage zurücksetzen';
+          resetPhaseBtn.addEventListener('click', async () => {
             if (!phaseId) {
               alert('Fehler: Phase-ID nicht gefunden. Bitte Seite neu laden.');
               return;
@@ -1611,21 +1637,51 @@ function renderInstanzSchrittVerwaltung() {
             try {
               await api(
                 `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
-                { method: 'DELETE' }
+                { method: 'DELETE', body: { umfang: 'phase' } }
               );
+              await schritteReload();
             } catch (err) {
               alert('Fehler beim Zurücksetzen: ' + err.message);
+            }
+          });
+
+          // Stufe 2 – zusätzlich Schritt-Umbenennungen und Ausgeblendete
+          const resetAllesBtn = document.createElement('button');
+          resetAllesBtn.type = 'button';
+          resetAllesBtn.className = 'btn-sekundaer btn';
+          resetAllesBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
+          resetAllesBtn.textContent = '↺ Alles';
+          resetAllesBtn.title = 'Phase, Schritt-Umbenennungen und ausgeblendete Schritte zurücksetzen';
+          resetAllesBtn.addEventListener('click', async () => {
+            if (!phaseId) {
+              alert('Fehler: Phase-ID nicht gefunden. Bitte Seite neu laden.');
               return;
             }
-          }
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          render();
-        });
+            if (!confirm(
+              `Alle Anpassungen der Phase „${s.phase}" zurücksetzen?\n\n` +
+              '• Phasenname und -farbe\n' +
+              '• Umbenannte Schritte erhalten wieder ihren Vorlage-Titel\n' +
+              '• Ausgeblendete Schritte werden wieder eingeblendet\n\n' +
+              'Selbst hinzugefügte Schritte bleiben erhalten.'
+            )) return;
+            try {
+              await api(
+                `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
+                { method: 'DELETE', body: { umfang: 'alles' } }
+              );
+              await schritteReload();
+            } catch (err) {
+              alert('Fehler beim Zurücksetzen: ' + err.message);
+            }
+          });
+
+          btnLeiste.appendChild(resetPhaseBtn);
+          btnLeiste.appendChild(resetAllesBtn);
+        }
 
         kopf.appendChild(farbWrap);
         kopf.appendChild(nameInput);
-        kopf.appendChild(resetBtn);
+        kopf.appendChild(btnLeiste);
         phaseBlock.appendChild(kopf);
 
         const schrittListe = document.createElement('div');
@@ -3339,8 +3395,10 @@ function renderHandbuch(schulname) {
 
         <p><strong>Schritte anpassen – Vorlage-Phasen:</strong><br>
         Jede Vorlage-Phase hat einen editierbaren Kopf mit Farbwähler und Namensfeld.
-        Änderungen betreffen nur diesen Prozess. „↺ zurücksetzen" setzt Phase auf
-        Vorlage-Standard zurück.<br>
+        Änderungen betreffen nur diesen Prozess.<br>
+        „↺ Phase" setzt nur Phasenname und -farbe auf den Vorlage-Standard zurück.
+        „↺ Alles" setzt zusätzlich Schritt-Umbenennungen zurück und blendet
+        ausgeblendete Schritte wieder ein – selbst hinzugefügte Schritte bleiben.<br>
         Pro Schritt: Titel umbenennen (Original bleibt als Hinweis sichtbar),
         „✕ ausblenden" / „↩ reaktivieren", ⎘ duplizieren.<br>
         Mit dem „+ Weiterer Schritt"-Feld am Ende jeder Phase können neue Schritte

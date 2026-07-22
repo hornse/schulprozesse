@@ -9,7 +9,36 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 Geplant:
 - E-Mail-Erinnerungen bei überfälligen Schritten
-- Alles-zurücksetzen für Prozess-Instanz-Anpassungen
+- Alles-zurücksetzen für den kompletten Prozess (aktuell nur pro Phase)
+
+---
+
+## [2.2.2] – 2026-07-22
+
+### Hinzugefügt
+- **Zurücksetzen in zwei Stufen** – jede Vorlage-Phase hat unter
+  „Prozess verwalten" jetzt zwei Buttons statt einem:
+  - „↺ Phase" setzt nur Phasenname und -farbe auf den Vorlage-Standard
+    zurück (bisheriges Verhalten)
+  - „↺ Alles" setzt zusätzlich die Schritt-Umbenennungen dieser Phase
+    zurück und blendet ausgeblendete Schritte wieder ein; selbst
+    hinzugefügte Schritte bleiben erhalten. Mit Bestätigungsdialog, der
+    auflistet was zurückgesetzt wird.
+- `DELETE /api/prozesse/{id}/instanz-phasen/{phase_id}` akzeptiert jetzt
+  einen Body-Parameter `umfang` (`phase` = Standard, `alles`)
+
+### Behoben
+- **Duplizierte Phasen-Blöcke** in der Verwaltungsansicht – `neuerPhaseBlock`
+  legt bei jedem Phasenwechsel einen Block an und erkennt damit nur
+  aufeinanderfolgende Wechsel. Da neu angelegte Schritte hohe
+  `vorlage_reihenfolge`-Werte bekamen, wechselte die Phase in der Sortierung
+  mehrfach hin und her und erzeugte pro Wechsel einen neuen Block. Die
+  Schritte werden jetzt vor dem Gruppieren nach `phase_reihenfolge` sortiert.
+- **Zurücksetzen ohne Wirkung** – der Handler löschte nur `instanz_phasen`,
+  was bei Prozessen ohne überschriebenen Phasennamen wirkungslos war
+- Der Löschen-Handler für eigene Phasen griff auf eine nicht mehr
+  existierende Variable `alle` zu und schlug still fehl
+- Debug-Ausgaben (`console.log`) aus der Entwicklung entfernt
 
 ---
 

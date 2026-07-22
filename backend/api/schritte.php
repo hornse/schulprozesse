@@ -385,19 +385,53 @@ function handleUpsertInstanzPhase(PDO $db, array $config, array $input, array $p
     Response::json(['ok' => true]);
 }
 
+/**
+ * Setzt die Anpassungen einer Vorlage-Phase für einen Prozess zurück.
+ *
+ * umfang = 'phase' (Standard): nur Phasenname und -farbe
+ * umfang = 'alles':            zusätzlich Schritt-Umbenennungen dieser Phase
+ *                              zurücksetzen und ausgeblendete Schritte wieder
+ *                              einblenden. Selbst hinzugefügte Schritte bleiben.
+ */
 function handleDeleteInstanzPhase(PDO $db, array $config, array $input, array $params): void
 {
     $user      = Guard::requireLogin($db);
     $prozessId = (int) $params['prozess_id'];
     $phaseId   = (int) $params['phase_id'];
+    $umfang    = ($input['umfang'] ?? 'phase') === 'alles' ? 'alles' : 'phase';
 
     Guard::requireProzessVerantwortlich($db, $prozessId);
 
-    $db->prepare(
-        'DELETE FROM instanz_phasen WHERE prozess_id = :p AND phase_id = :ph'
-    )->execute([':p' => $prozessId, ':ph' => $phaseId]);
+    $db->beginTransaction();
+    try {
+        // Immer: überschriebenen Phasennamen/-farbe entfernen
+        $db->prepare(
+            'DELETE FROM instanz_phasen WHERE prozess_id = :p AND phase_id = :ph'
+        )->execute([':p' => $prozessId, ':ph' => $phaseId]);
 
-    Response::json(['ok' => true]);
+        $zurueckgesetzt = 0;
+        if ($umfang === 'alles') {
+            // Schritt-Umbenennungen zurücksetzen und Ausgeblendete einblenden –
+            // nur für Schritt-Instanzen deren Vorlage zu dieser Phase gehört.
+            $stmt = $db->prepare(
+                'UPDATE schritt_instanzen
+                    SET instanz_titel = NULL,
+                        instanz_reihenfolge = NULL,
+                        deaktiviert = 0
+                  WHERE prozess_id = :p
+                    AND vorlage_id IN (SELECT id FROM schritt_vorlagen WHERE phase_id = :ph)'
+            );
+            $stmt->execute([':p' => $prozessId, ':ph' => $phaseId]);
+            $zurueckgesetzt = $stmt->rowCount();
+        }
+
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+
+    Response::json(['ok' => true, 'umfang' => $umfang, 'schritte' => $zurueckgesetzt]);
 }
 
 // ============================================================================

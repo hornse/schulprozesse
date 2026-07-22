@@ -77,8 +77,11 @@ Nur freigegebene Personen (unter Admin → Zugriff) können zugewiesen werden.
 Jede Vorlage-Phase hat einen editierbaren Kopf (Farbwähler + Namensfeld).
 - Farbe ändern → sofort in Checkliste sichtbar
 - Name ändern → Enter oder Feld verlassen zum Speichern
-- „↺ zurücksetzen" → Phase auf Vorlage-Standard zurücksetzen
-  (Schritt-Umbenennungen bleiben erhalten)
+- „↺ Phase" → setzt nur Phasenname und -farbe auf den Vorlage-Standard
+  zurück; Schritt-Umbenennungen und Ausblendungen bleiben erhalten
+- „↺ Alles" → setzt zusätzlich alle Schritt-Umbenennungen dieser Phase
+  zurück und blendet ausgeblendete Schritte wieder ein. Selbst
+  hinzugefügte Schritte bleiben erhalten. Es erscheint eine Rückfrage.
 - „+ Weiterer Schritt" → neuer Schritt direkt in dieser Phase,
   erscheint nur in diesem Prozess
 
@@ -93,6 +96,7 @@ Pro Schritt:
 - „💾 Phase mit Schritten speichern"
 - Bestehende eigene Phasen: Name und Farbe direkt editierbar,
   Schritte umbenennbar, löschbar und nachträglich ergänzbar
+- „✕ Phase löschen" entfernt die eigene Phase mit allen ihren Schritten
 
 ### Aktivitätsprotokoll
 Letzte 200 Aktionen dieses Prozesses, als CSV exportierbar.

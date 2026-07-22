@@ -1445,10 +1445,6 @@ function renderProzessVerwaltungInhalt() {
 let instanzPhasenPuffer = {};
 
 function renderInstanzSchrittVerwaltung() {
-  console.log('renderInstanzSchrittVerwaltung aufgerufen, prozessId=', STATE.prozessId);
-  const alleVorlagen = (STATE.schritteAlle || STATE.schritte).filter(s => s.quelle !== 'eigen');
-  const phasenImState = [...new Set(alleVorlagen.map(s => s.phase))];
-  console.log('Phasen in schritteAlle:', phasenImState);
   const block = document.createElement('div');
   block.className = 'admin-section';
 
@@ -1485,6 +1481,16 @@ function renderInstanzSchrittVerwaltung() {
       const gefunden = nurVorlagen.find((sc) => sc.phase === phaseName && sc.phase_id);
       return gefunden?.phase_id ?? null;
     }
+
+    // WICHTIG: nach Phase gruppiert sortieren. neuerPhaseBlock() legt bei
+    // jedem Phasenwechsel einen Block an – sind die Schritte nicht am Stück
+    // sortiert, entstehen Duplikat-Blöcke derselben Phase.
+    nurVorlagen = [...nurVorlagen].sort((a, b) =>
+      (a.phase_reihenfolge ?? 0) - (b.phase_reihenfolge ?? 0)
+      || String(a.phase).localeCompare(String(b.phase))
+      || (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0)
+      || (a.id ?? 0) - (b.id ?? 0)
+    );
 
     let aktuellePhase = null;
       let aktuellerPhaseBlock = null;
@@ -1589,7 +1595,6 @@ function renderInstanzSchrittVerwaltung() {
           ? 'Alle Schritte dieser Phase löschen'
           : 'Auf Vorlage-Standard zurücksetzen';
         resetBtn.addEventListener('click', async () => {
-          console.log('resetBtn: phaseId=', phaseId, 'istEigenPhase=', istEigenPhase);
           if (istEigenPhase) {
             const schritteDieserPhase = alle.filter(
               (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
@@ -1642,19 +1647,16 @@ function renderInstanzSchrittVerwaltung() {
         const doAdd = async () => {
           const titel = addInput.value.trim();
           if (!titel) return;
-          console.log('doAdd: phaseId=', phaseId, 'istEigenPhase=', istEigenPhase, 's.phase_id=', s.phase_id);
           if (!phaseId) {
             alert('Fehler: phase_id nicht gefunden (' + s.phase + '). Bitte Seite neu laden.');
             return;
           }
           addBtn.disabled = true;
           try {
-            console.log('doAdd: calling API', `/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`);
             const result = await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`, {
               method: 'POST',
               body: { titel }
             });
-            console.log('doAdd: API result', result);
             const [res, resAlle] = await Promise.all([
               api(`/api/schritte?prozess_id=${STATE.prozessId}`),
               api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
@@ -1663,7 +1665,6 @@ function renderInstanzSchrittVerwaltung() {
             STATE.schritteAlle = resAlle.schritte;
             render();
           } catch (err) {
-            console.error('doAdd error:', err);
             alert('Fehler: ' + err.message);
             addBtn.disabled = false;
           }

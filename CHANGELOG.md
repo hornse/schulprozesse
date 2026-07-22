@@ -16,6 +16,15 @@ Geplant:
 ## [2.2.2] – 2026-07-22
 
 ### Hinzugefügt
+- **Selbst hinzugefügte Schritte löschen** – Schritte die über
+  „+ Weiterer Schritt" nur für einen Prozess angelegt wurden, tragen jetzt
+  das Kennzeichen „nur hier" und haben einen 🗑-Button zum endgültigen
+  Löschen (mit Rückfrage). Echte Vorlage-Schritte lassen sich weiterhin nur
+  ausblenden – ein Löschversuch wird serverseitig mit HTTP 409 abgelehnt,
+  da sie zur Standard-Vorlage gehören.
+- `DELETE /api/schritte/{id}` löscht Schritt-Instanz und zugehörige Vorlage,
+  sofern die Vorlage von genau einem Prozess genutzt wird
+- `GET /api/schritte` liefert je Schritt zusätzlich `nur_dieser_prozess`
 - **Zurücksetzen in zwei Stufen** – jede Vorlage-Phase hat unter
   „Prozess verwalten" jetzt zwei Buttons statt einem:
   - „↺ Phase" setzt nur Phasenname und -farbe auf den Vorlage-Standard

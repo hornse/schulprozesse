@@ -64,6 +64,7 @@ $routes = [
 
     ['GET',    '#^api/schritte$#',                                       'handleListSchritte'],
     ['PATCH',  '#^api/schritte/(?P<id>\d+)$#',                           'handleUpdateSchritt'],
+    ['DELETE', '#^api/schritte/(?P<id>\d+)$#',                           'handleDeleteSchrittInstanz'],
     ['POST',   '#^api/schritte/(?P<id>\d+)/duplizieren$#',               'handleDuplizierenSchritt'],
 
     // Prozessspezifische Phasen-Anpassungen

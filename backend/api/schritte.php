@@ -54,7 +54,9 @@ function handleListSchritte(PDO $db, array $config, array $input): void
                 sv.beschreibung,
                 COALESCE(si.instanz_titel, sv.titel)             AS titel,
                 COALESCE(si.instanz_reihenfolge, sv.reihenfolge) AS reihenfolge,
-                "vorlage" AS quelle
+                "vorlage" AS quelle,
+                (SELECT COUNT(*) FROM schritt_instanzen si2
+                  WHERE si2.vorlage_id = sv.id) = 1 AS nur_dieser_prozess
          FROM schritt_instanzen si
          JOIN schritt_vorlagen sv ON sv.id = si.vorlage_id
          JOIN phasen p ON p.id = sv.phase_id
@@ -520,4 +522,56 @@ function handleDuplizierenSchritt(PDO $db, array $config, array $input, array $p
         }
         Response::json(['id' => $neueVorlageId, 'typ' => 'vorlage'], 201);
     }
+}
+
+/**
+ * Löscht einen Vorlage-Schritt der nur zu einem einzigen Prozess gehört
+ * (angelegt über "+ Weiterer Schritt" unter "Prozess verwalten").
+ *
+ * Schutz: Schritte deren Vorlage von mehreren Prozessen genutzt wird –
+ * also echte Standard-Vorlagenschritte – werden abgelehnt. Die können in
+ * der Prozessansicht nur ausgeblendet werden.
+ *
+ * DELETE /api/schritte/{id}
+ */
+function handleDeleteSchrittInstanz(PDO $db, array $config, array $input, array $params): void
+{
+    $user = Guard::requireLogin($db);
+    $id   = (int) $params['id'];
+
+    $stmt = $db->prepare(
+        'SELECT si.prozess_id, si.vorlage_id, sv.titel,
+                (SELECT COUNT(*) FROM schritt_instanzen si2
+                  WHERE si2.vorlage_id = si.vorlage_id) AS anzahl_instanzen
+           FROM schritt_instanzen si
+           JOIN schritt_vorlagen sv ON sv.id = si.vorlage_id
+          WHERE si.id = :id'
+    );
+    $stmt->execute([':id' => $id]);
+    $schritt = $stmt->fetch();
+    if (!$schritt) Response::error('Schritt nicht gefunden.', 404);
+
+    Guard::requireProzessVerantwortlich($db, (int) $schritt['prozess_id']);
+
+    if ((int) $schritt['anzahl_instanzen'] > 1) {
+        Response::error(
+            'Dieser Schritt stammt aus der Standard-Vorlage und kann hier nur '
+            . 'ausgeblendet werden. Löschen ist nur in der Vorlagenverwaltung möglich.',
+            409
+        );
+    }
+
+    $db->beginTransaction();
+    try {
+        $db->prepare('DELETE FROM schritt_instanzen WHERE id = :id')
+           ->execute([':id' => $id]);
+        $db->prepare('DELETE FROM schritt_vorlagen WHERE id = :vid')
+           ->execute([':vid' => $schritt['vorlage_id']]);
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+
+    Response::json(['ok' => true, 'titel' => $schritt['titel']]);
 }

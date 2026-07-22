@@ -89,6 +89,10 @@ Pro Schritt:
 - Titel umbenennen (Original bleibt als „← Originalname" sichtbar)
 - „✕ ausblenden" / „↩ reaktivieren"
 - ⎘ duplizieren
+- 🗑 löschen – nur bei Schritten mit dem Kennzeichen „nur hier", also
+  solchen die über „+ Weiterer Schritt" für diesen Prozess angelegt wurden.
+  Schritte aus der Standard-Vorlage lassen sich hier nicht löschen, da sie
+  zu allen Prozessen gehören – sie können nur ausgeblendet werden.
 
 **Eigene Phasen und Schritte:**
 - Phasenname eingeben, Farbe wählen

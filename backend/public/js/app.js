@@ -1748,18 +1748,25 @@ function renderInstanzSchrittVerwaltung() {
         zeile.className = 'instanz-schritt-zeile' + (s.deaktiviert ? ' deaktiviert' : '');
         const origTitel = s.vorlage_titel ?? s.titel ?? '';
         const anzeigetitel = s.instanz_titel ?? origTitel;
+        // Nur für diesen Prozess angelegte Schritte dürfen gelöscht werden;
+        // echte Vorlage-Schritte können hier nur ausgeblendet werden.
+        const nurHier = !!s.nur_dieser_prozess;
         zeile.innerHTML = `
           <input type="text" class="instanz-titel-feld"
                  value="${anzeigetitel.replace(/"/g, '&quot;')}"
                  placeholder="${origTitel.replace(/"/g, '&quot;')}"
                  title="Umbenennen (nur für diesen Prozess)">
           <span class="instanz-orig">${s.instanz_titel ? '← ' + origTitel : ''}</span>
+          ${nurHier ? '<span class="schritt-badge" title="Nur in diesem Prozess">nur hier</span>' : ''}
           <button class="btn-sekundaer btn" data-dup
                   style="width:auto;font-size:11px;padding:3px 8px;" title="Schritt duplizieren">⎘</button>
           <button class="btn-sekundaer btn" data-toggle-deakt
                   style="width:auto;font-size:11px;padding:3px 8px;">
             ${s.deaktiviert ? '↩ reaktivieren' : '✕ ausblenden'}
-          </button>`;
+          </button>
+          ${nurHier ? `<button class="btn-sekundaer btn btn-gefahr" data-loeschen
+                  style="width:auto;font-size:11px;padding:3px 8px;"
+                  title="Diesen Schritt endgültig löschen">🗑</button>` : ''}`;
 
         const titelFeld = zeile.querySelector('.instanz-titel-feld');
         const origSpan  = zeile.querySelector('.instanz-orig');
@@ -1828,6 +1835,29 @@ function renderInstanzSchrittVerwaltung() {
             render();
           } catch (err) { alert('Fehler: ' + err.message); }
         });
+
+        const loeschBtnZeile = zeile.querySelector('[data-loeschen]');
+        if (loeschBtnZeile) {
+          loeschBtnZeile.addEventListener('click', async () => {
+            if (!confirm(
+              `Schritt „${anzeigetitel}" endgültig löschen?\n\n` +
+              'Der Schritt gehört nur zu diesem Prozess und kann nicht ' +
+              'wiederhergestellt werden.'
+            )) return;
+            try {
+              await api(`/api/schritte/${s.id}`, { method: 'DELETE' });
+              const [res, resAlle] = await Promise.all([
+                api(`/api/schritte?prozess_id=${STATE.prozessId}`),
+                api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
+              ]);
+              STATE.schritte     = res.schritte;
+              STATE.schritteAlle = resAlle.schritte;
+              render();
+            } catch (err) {
+              alert('Fehler beim Löschen: ' + err.message);
+            }
+          });
+        }
 
         zeile.querySelector('[data-toggle-deakt]').addEventListener('click', async () => {
           await api(`/api/schritte/${s.id}`, {
@@ -3400,7 +3430,10 @@ function renderHandbuch(schulname) {
         „↺ Alles" setzt zusätzlich Schritt-Umbenennungen zurück und blendet
         ausgeblendete Schritte wieder ein – selbst hinzugefügte Schritte bleiben.<br>
         Pro Schritt: Titel umbenennen (Original bleibt als Hinweis sichtbar),
-        „✕ ausblenden" / „↩ reaktivieren", ⎘ duplizieren.<br>
+        „✕ ausblenden" / „↩ reaktivieren", ⎘ duplizieren. Schritte mit dem
+        Kennzeichen „nur hier" gehören ausschließlich zu diesem Prozess und
+        lassen sich mit 🗑 endgültig löschen; Vorlage-Schritte können dagegen
+        nur ausgeblendet werden.<br>
         Mit dem „+ Weiterer Schritt"-Feld am Ende jeder Phase können neue Schritte
         direkt zu dieser Phase hinzugefügt werden – sie erscheinen nur in diesem
         Prozess und nicht in anderen.</p>

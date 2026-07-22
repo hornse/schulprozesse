@@ -412,6 +412,14 @@ main{
   font-size:11px; color:var(--muted); font-style:italic; white-space:nowrap;
 }
 
+/* Kennzeichnet Schritte die nur zu diesem Prozess gehören und daher
+   gelöscht (statt nur ausgeblendet) werden können. */
+.schritt-badge{
+  font-size:10px; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--muted); border:1px solid var(--line); border-radius:10px;
+  padding:1px 7px; white-space:nowrap; flex-shrink:0;
+}
+
 .neue-instanz-phase-form{
   background:var(--paper-2); border:1px solid var(--line); border-radius:8px;
   padding:14px; margin-top:4px;

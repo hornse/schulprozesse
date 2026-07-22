@@ -91,8 +91,9 @@ Pro Schritt:
 - ⎘ duplizieren
 - 🗑 löschen – nur bei Schritten mit dem Kennzeichen „nur hier", also
   solchen die über „+ Weiterer Schritt" für diesen Prozess angelegt wurden.
-  Schritte aus der Standard-Vorlage lassen sich hier nicht löschen, da sie
-  zu allen Prozessen gehören – sie können nur ausgeblendet werden.
+  Schritte aus der Vorlage lassen sich hier nicht löschen – sie gehören zur
+  Vorlage und können nur ausgeblendet werden. Löschen ist dort in der
+  Vorlagenverwaltung im Admin-Bereich möglich.
 
 **Eigene Phasen und Schritte:**
 - Phasenname eingeben, Farbe wählen

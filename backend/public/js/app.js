@@ -1604,7 +1604,7 @@ function renderInstanzSchrittVerwaltung() {
           loeschBtn.type = 'button';
           loeschBtn.className = 'btn-sekundaer btn btn-gefahr';
           loeschBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
-          loeschBtn.textContent = '✕ Phase löschen';
+          loeschBtn.textContent = '🗑 Phase';
           loeschBtn.title = 'Diese eigene Phase mit allen Schritten löschen';
           loeschBtn.addEventListener('click', async () => {
             const schritteDieserPhase = nurVorlagen.filter(
@@ -1980,7 +1980,8 @@ function renderInstanzSchrittVerwaltung() {
             <input type="text" class="vorlagen-titel-feld"
                    value="${s.titel.replace(/"/g, '&quot;')}">
             <button class="btn-sekundaer btn btn-gefahr"
-                    style="width:auto;font-size:11px;padding:3px 8px;">✕ löschen</button>
+                    style="width:auto;font-size:11px;padding:3px 8px;"
+                    title="Diesen Schritt endgültig löschen">🗑</button>
           </div>`;
         zeile.querySelector('.vorlagen-titel-feld').addEventListener('change', async (e) => {
           await api(`/api/instanz-schritte/${s.id}`, {

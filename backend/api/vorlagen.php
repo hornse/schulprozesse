@@ -221,13 +221,14 @@ function handleCreateVorlageFuerProzess(PDO $db, array $config, array $input, ar
     )->fetchColumn();
 
     $db->prepare(
-        'INSERT INTO schritt_vorlagen (phase_id, reihenfolge, titel, beschreibung, kann_parallel)
-         VALUES (:phase_id, :r, :titel, :beschreibung, 0)'
+        'INSERT INTO schritt_vorlagen (phase_id, reihenfolge, titel, beschreibung, kann_parallel, prozess_id)
+         VALUES (:phase_id, :r, :titel, :beschreibung, 0, :prozess_id)'
     )->execute([
         ':phase_id'     => $phaseId,
         ':r'            => $maxR + 1,
         ':titel'        => $titel,
         ':beschreibung' => $input['beschreibung'] ?? null,
+        ':prozess_id'   => $prozessId,
     ]);
     $vorlageId = (int) $db->lastInsertId();
 

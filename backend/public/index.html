@@ -1,25 +1,32 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-projekt="schulprozesse">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Schulprozesse</title>
-<link rel="stylesheet" href="css/style.css?v=202607221130">
+<!-- Tokens zuerst, die projekteigene Datei zuletzt: So gewinnt
+     style.css im Zweifel, und die Werte kommen dennoch aus einer
+     Quelle. -->
+<link rel="stylesheet" href="vendor/ci-css/ci-tokens.css?v=DEV">
+<link rel="stylesheet" href="css/style.css?v=DEV">
 </head>
 <body>
+
+<a href="#app" class="skip-link">Zum Inhalt springen</a>
+
 
 <!-- App-Shell: sticky Header mit Navigation -->
 <div id="app-shell">
   <div class="shell-brand">
     <div class="brand-left">
-      <img id="shell-logo" src="/api/einstellungen/logo" alt="Schullogo"
+      <img id="shell-logo" src="/api/einstellungen/logo" alt=""
            style="display:none;height:28px;width:auto;margin-right:10px;vertical-align:middle;"
            onerror="this.style.display='none'">
       <span class="brand-text" id="brand-text">Friedrich-Rückert-Gymnasium · <strong>Schulprozesse</strong></span>
     </div>
     <div id="shell-user"></div>
   </div>
-  <nav class="shell-nav" id="shell-nav">
+  <nav class="shell-nav" id="shell-nav" aria-label="Hauptnavigation">
     <!-- wird von app.js befüllt -->
   </nav>
 </div>
@@ -28,14 +35,14 @@
 <div id="prozess-leiste" style="display:none;" class="prozess-leiste"></div>
 
 <!-- Hauptinhalt -->
-<main id="app">
-  <p style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:13px;">Lädt…</p>
+<main id="app" tabindex="-1">
+  <p style="color:var(--muted);font-family:var(--ci-schrift-mono);font-size:13px;">Lädt…</p>
 </main>
 
 <footer>
   <span id="wer-bin-ich"></span>
 </footer>
 
-<script src="js/app.js?v=202607221130"></script>
+<script src="js/app.js?v=DEV"></script>
 </body>
 </html>

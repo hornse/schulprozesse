@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.idea/
+
+# Konfiguration mit Zugangsdaten – gehört NIE in git
+config/config.php
+
+# Laufzeitdaten
+data/

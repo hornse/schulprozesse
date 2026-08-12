@@ -1,27 +1,89 @@
-/*!
- * Schulprozesse – prozesse.hornse.de
- * Copyright (C) 2026 Sebastian Horn, Friedrich-Rückert-Gymnasium Düsseldorf
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
-
 /* ============================================================
-   Design-Tokens
+   Schulprozesse – Gestaltung
+
+   Farben, Radien und Schriften kommen seit v2.3.0 aus dem Modul
+   `hornse/ci-css` (vendored unter backend/public/vendor/ci-css/).
+
+   ENTFERNT: Der @import von fonts.googleapis.com mit drei
+   Schriftfamilien. Bei jedem Aufruf ging damit die IP-Adresse der
+   Nutzerin an einen Google-Server – bei einer Anwendung mit Anmeldung
+   ein Datenschutzproblem (vgl. LG München I, Az. 3 O 17493/20).
+   Inter und Space Grotesk sind der Systemschrift gewichen, IBM Plex
+   Mono der System-Monospace. Die Anmutung „Mono für Kennzahlen und
+   Datumsangaben" bleibt damit erhalten.
+
+   REGEL: Kein Farbwert ohne Token. Ausgenommen sind die
+   Kategorienpaletten im :root-Block – Rollen- und Sichtbarkeitsmarken
+   brauchen unterscheidbare Töne, die kein anderes Projekt nutzt.
+
+   Die Klassennamen sind unverändert geblieben.
+
+   SPDX-License-Identifier: GPL-3.0-or-later
    ============================================================ */
+
 :root{
-  --ink:#1B2A4A;
-  --paper:#F6F4EF;
-  --paper-2:#EFEBE2;
-  --line:#DDD7C8;
-  --muted:#6B6457;
-  --error:#B5577A;
-  --accent:#5B6FA8;
+  /* ---- Abbildung auf die gemeinsamen Tokens ---------------- */
+  --ink:var(--ci-text);
+  --paper:var(--ci-grund);
+  --paper-2:var(--ci-flaeche-2);
+  --line:var(--ci-linie);
+  --muted:var(--ci-text-blass);
+
+  /* --error stand auf #B5577A und erreichte gegen --paper nur 4.15,
+     gegen --paper-2 sogar 3.83 – ausgerechnet die Farbe für
+     Fehlermeldungen lag unter dem geforderten Wert von 4.5. */
+  --error:var(--ci-fehler);
+
+  /* --accent stand auf #5B6FA8: 4.46 gegen --paper, 4.12 gegen
+     --paper-2, und als „das Blaue" dem #1d4e89 von sprechtag zu nahe.
+     Das Indigo aus ci-css erreicht 6.93 gegen Weiss und ist gegen
+     sprechtag klar unterscheidbar. */
+  --accent:var(--ci-akzent);
+  --accent-flaeche:var(--ci-akzent-flaeche);
+  --accent-text:var(--ci-akzent-text);
+
+  --flaeche:var(--ci-flaeche);
   --nav-h:56px;
+
+  /* ---- Kategorienpaletten (projekteigen) -------------------
+     Marken fuer Sichtbarkeit und Rollen. Jede Kombination erreicht
+     auf ihrer Flaeche den WCAG-Kontrast AA. */
+  --m-oeffentlich:#2e7d32;      --m-oeffentlich-bg:#e8f5e9;
+  --m-privat:#c62828;           --m-privat-bg:#fce4ec;
+  --m-verantwortlich:#1565c0;   --m-verantwortlich-bg:#e3f2fd;
+  --m-mitarbeitend:#6a1b9a;     --m-mitarbeitend-bg:#f3e5f5;
+
+  /* Verlauf der Fortschrittsanzeige, Gefahrenfarbe */
+  --verlauf-start:#D98A2B;
+  --gefahr:var(--ci-fehler);
+  --gefahr-flaeche:var(--ci-fehler-flaeche);
+
+  /* ---- Transparenzen --------------------------------------- */
+  --auf-dunkel-1:rgba(255,255,255,.1);
+  --auf-dunkel-2:rgba(255,255,255,.15);
+  --auf-dunkel-3:rgba(255,255,255,.25);
+  --schatten-1:rgba(0,0,0,.07);
+  --schatten-2:rgba(0,0,0,.15);
 }
+
+/* Sprungmarke: Ohne sie muss sich jede Tastaturbedienung bei jedem
+   Ansichtswechsel erst durch die Navigation arbeiten. */
+.skip-link{ position:absolute; left:-9999px; z-index:200;
+  background:var(--flaeche); color:var(--accent);
+  padding:10px 16px; border-radius:6px; }
+.skip-link:focus{ left:12px; top:12px;
+  outline:3px solid var(--accent); outline-offset:2px; }
+
+/* Der Hauptbereich ist Sprung- und Fokusziel. Bewusst OHNE sichtbaren
+   Rahmen: Der Fokus wird programmatisch gesetzt, niemand ist per
+   Tastatur dorthin navigiert - ein Rahmen um den halben Bildschirm
+   waere nur verwirrend. */
+#app:focus, #app:focus-visible{ outline:none; }
+
 *{ box-sizing:border-box; }
 body{
   margin:0; background:var(--paper); color:var(--ink);
-  font-family:'Inter',system-ui,sans-serif;
+  font-family:var(--ci-schrift);
   min-height:100vh; display:flex; flex-direction:column;
 }
 
@@ -30,43 +92,43 @@ body{
    ============================================================ */
 #app-shell{
   position:sticky; top:0; z-index:200;
-  background:var(--ink); color:#fff;
-  box-shadow:0 2px 8px rgba(0,0,0,.18);
+  background:var(--ink); color:var(--flaeche);
+  box-shadow:0 2px 8px var(--schatten-2);
 }
 
 /* Zeile 1: Marke + Benutzer */
 .shell-brand{
   display:flex; align-items:center; justify-content:space-between;
-  padding:0 28px; height:44px; border-bottom:1px solid rgba(255,255,255,.1);
+  padding:0 28px; height:44px; border-bottom:1px solid var(--auf-dunkel-1);
 }
 .brand-left{ display:flex; align-items:center; }
 .brand-text{
-  font-family:'IBM Plex Mono',monospace; font-size:11px;
-  letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.65);
+  font-family:var(--ci-schrift-mono); font-size:11px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--auf-dunkel-3);
 }
-.brand-text strong{ color:#fff; letter-spacing:.06em; }
+.brand-text strong{ color:var(--flaeche); letter-spacing:.06em; }
 .shell-user{
   display:flex; align-items:center; gap:10px; font-size:13px;
 }
-.shell-user-name{ color:#fff; font-weight:500; }
+.shell-user-name{ color:var(--flaeche); font-weight:500; }
 .shell-user-rolle{
-  font-size:9px; font-family:'IBM Plex Mono',monospace; text-transform:uppercase;
+  font-size:9px; font-family:var(--ci-schrift-mono); text-transform:uppercase;
   padding:2px 7px; border-radius:3px; letter-spacing:.05em;
-  background:rgba(255,255,255,.15); color:rgba(255,255,255,.85);
+  background:var(--auf-dunkel-2); color:var(--flaeche);
 }
-.shell-user-rolle.rolle-admin{ background:rgba(91,111,168,.5); }
+.shell-user-rolle.rolle-admin{ background:var(--accent); }
 .shell-abmelden{
   font-size:12px; padding:4px 10px; border-radius:5px;
-  border:1px solid rgba(255,255,255,.25); background:transparent;
-  color:rgba(255,255,255,.8); cursor:pointer; transition:all .15s;
+  border:1px solid var(--auf-dunkel-3); background:transparent;
+  color:var(--flaeche); cursor:pointer; transition:all .15s;
 }
-.shell-abmelden:hover{ background:rgba(255,255,255,.1); color:#fff; }
+.shell-abmelden:hover{ background:var(--auf-dunkel-1); color:var(--flaeche); }
 .shell-anmelden{
   font-size:12px; padding:4px 12px; border-radius:5px;
-  border:1px solid rgba(255,255,255,.3); background:rgba(255,255,255,.1);
-  color:#fff; cursor:pointer; transition:all .15s;
+  border:1px solid var(--auf-dunkel-3); background:var(--auf-dunkel-1);
+  color:var(--flaeche); cursor:pointer; transition:all .15s;
 }
-.shell-anmelden:hover{ background:rgba(255,255,255,.2); }
+.shell-anmelden:hover{ background:var(--auf-dunkel-2); }
 
 /* Zeile 2: Hauptnavigation */
 .shell-nav{
@@ -78,16 +140,16 @@ body{
 .nav-tab{
   display:flex; align-items:center; gap:6px;
   padding:0 14px; height:var(--nav-h); border:none; background:transparent;
-  color:rgba(255,255,255,.55); font-size:13.5px; font-weight:500;
+  color:var(--auf-dunkel-3); font-size:13.5px; font-weight:500;
   cursor:pointer; white-space:nowrap; border-bottom:3px solid transparent;
   transition:color .15s, border-color .15s;
-  font-family:'Inter',system-ui,sans-serif;
+  font-family:var(--ci-schrift);
 }
-.nav-tab:hover{ color:rgba(255,255,255,.85); }
-.nav-tab.aktiv{ color:#fff; border-bottom-color:#fff; }
+.nav-tab:hover{ color:var(--flaeche); }
+.nav-tab.aktiv{ color:var(--flaeche); border-bottom-color:var(--flaeche); }
 .nav-tab .nav-icon{ font-size:15px; }
 .nav-sep{
-  width:1px; height:20px; background:rgba(255,255,255,.12);
+  width:1px; height:20px; background:var(--auf-dunkel-1);
   margin:0 6px; flex-shrink:0;
 }
 
@@ -105,7 +167,7 @@ body{
   font-size:13px; cursor:pointer; color:var(--muted);
   border-bottom:3px solid transparent; white-space:nowrap;
   transition:color .15s, border-color .15s;
-  font-family:'Inter',system-ui,sans-serif;
+  font-family:var(--ci-schrift);
   display:flex; flex-direction:column; align-items:flex-start; gap:4px;
 }
 .prozess-tab:hover{ color:var(--ink); }
@@ -145,11 +207,11 @@ main{
   display:flex; align-items:baseline; gap:12px;
 }
 .page-title{
-  font-family:'Space Grotesk',sans-serif; font-size:22px;
+  font-family:var(--ci-schrift); font-size:22px;
   font-weight:700; margin:0; color:var(--ink);
 }
 .page-subtitle{
-  font-family:'IBM Plex Mono',monospace; font-size:11px;
+  font-family:var(--ci-schrift-mono); font-size:11px;
   color:var(--muted); text-transform:uppercase; letter-spacing:.06em;
 }
 
@@ -158,11 +220,11 @@ main{
    ============================================================ */
 .login-wrap{
   max-width:360px; margin:60px auto; padding:32px;
-  background:#fff; border:1px solid var(--line); border-radius:12px;
-  box-shadow:0 4px 24px rgba(0,0,0,.07);
+  background:var(--flaeche); border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 4px 24px var(--schatten-1);
 }
 .login-wrap h2{
-  font-family:'Space Grotesk',sans-serif; font-size:20px;
+  font-family:var(--ci-schrift); font-size:20px;
   margin:0 0 6px; color:var(--ink);
 }
 .login-wrap p{
@@ -170,7 +232,7 @@ main{
 }
 .login-wrap label{
   display:block; font-size:11px; color:var(--muted); margin-bottom:4px;
-  font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.04em;
+  font-family:var(--ci-schrift-mono); text-transform:uppercase; letter-spacing:.04em;
 }
 .login-wrap input{
   width:100%; padding:10px 12px; margin-bottom:14px;
@@ -184,7 +246,7 @@ main{
    Buttons
    ============================================================ */
 .btn{
-  background:var(--ink); color:#fff; border:none; border-radius:7px;
+  background:var(--ink); color:var(--flaeche); border:none; border-radius:7px;
   padding:10px 18px; font-size:14px; font-weight:500; cursor:pointer;
   width:100%; transition:opacity .15s;
 }
@@ -195,8 +257,8 @@ main{
   transition:all .15s; width:auto;
 }
 .btn-sekundaer:hover{ border-color:var(--accent); color:var(--accent); }
-.btn-gefahr{ border-color:#c0392b; color:#c0392b; }
-.btn-gefahr:hover{ background:#fff0f0; }
+.btn-gefahr{ border-color:var(--gefahr); color:var(--gefahr); }
+.btn-gefahr:hover{ background:var(--gefahr-flaeche); }
 
 /* ============================================================
    Fortschritt
@@ -207,11 +269,11 @@ main{
   background:var(--paper-2); border:1px solid var(--line); overflow:hidden;
 }
 .progress-fill{
-  height:100%; background:linear-gradient(90deg,#D98A2B,var(--accent));
+  height:100%; background:linear-gradient(90deg,var(--verlauf-start),var(--accent));
   transition:width .4s ease;
 }
 .progress-label{
-  font-family:'IBM Plex Mono',monospace; font-size:12px;
+  font-family:var(--ci-schrift-mono); font-size:12px;
   color:var(--muted); white-space:nowrap;
 }
 
@@ -223,37 +285,37 @@ main{
   grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
 }
 .dash-block{
-  background:#fff; border:1px solid var(--line); border-radius:10px;
+  background:var(--flaeche); border:1px solid var(--line); border-radius:10px;
   padding:16px 18px;
 }
 .dash-aktuell{ border-left:4px solid var(--accent); }
 .dash-label{
-  font-family:'IBM Plex Mono',monospace; font-size:10.5px;
+  font-family:var(--ci-schrift-mono); font-size:10.5px;
   text-transform:uppercase; letter-spacing:.06em;
   color:var(--muted); margin:0 0 8px;
 }
 .dash-titel{
-  font-family:'Space Grotesk',sans-serif; font-weight:700;
+  font-family:var(--ci-schrift); font-weight:700;
   font-size:16px; margin:0 0 4px;
 }
 .dash-meta{ font-size:12.5px; color:var(--muted); margin:0; }
 .dash-liste{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
 .dash-liste li{ display:flex; gap:10px; font-size:13.5px; align-items:baseline; }
-.dash-datum{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted); min-width:44px; }
+.dash-datum{ font-family:var(--ci-schrift-mono); font-size:11.5px; color:var(--muted); min-width:44px; }
 .dash-datum-rot{ color:var(--error); font-weight:600; }
 .dash-phasenzeile{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-.dash-phasenname{ font-size:12px; min-width:140px; font-family:'IBM Plex Mono',monospace; }
+.dash-phasenname{ font-size:12px; min-width:140px; font-family:var(--ci-schrift-mono); }
 
 /* ============================================================
    Schritte / Checkliste
    ============================================================ */
 .phase-title{
-  font-family:'Space Grotesk',sans-serif; font-weight:700;
+  font-family:var(--ci-schrift); font-weight:700;
   font-size:13.5px; margin:20px 0 8px; color:var(--muted);
   text-transform:uppercase; letter-spacing:.05em;
 }
 .schritt{
-  background:#fff; border:1px solid var(--line);
+  background:var(--flaeche); border:1px solid var(--line);
   border-left:3px solid var(--accent, var(--accent));
   border-radius:8px; margin-bottom:6px; overflow:hidden;
 }
@@ -270,7 +332,7 @@ main{
 .checkbox.checked{
   background:var(--accent,var(--accent)); border-color:var(--accent,var(--accent));
 }
-.checkbox.checked::after{ content:"✓"; color:#fff; font-size:11px; font-weight:700; }
+.checkbox.checked::after{ content:"✓"; color:var(--flaeche); font-size:11px; font-weight:700; }
 .schritt-text{ flex:1; font-size:14px; line-height:1.4; }
 .schritt-text.erledigt{ text-decoration:line-through; color:var(--muted); }
 .chev{
@@ -286,7 +348,7 @@ main{
 .felder{ display:flex; gap:12px; flex-wrap:wrap; margin-top:4px; }
 .feld{ display:flex; flex-direction:column; gap:3px; }
 .feld label{
-  font-family:'IBM Plex Mono',monospace; font-size:10px;
+  font-family:var(--ci-schrift-mono); font-size:10px;
   text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
 }
 .feld input{
@@ -310,7 +372,7 @@ main{
 /* Parallel */
 .parallel-gruppe{
   border:1.5px dashed var(--line); border-radius:8px;
-  padding:6px; margin-bottom:8px; background:#fafaf8;
+  padding:6px; margin-bottom:8px; background:var(--paper);
 }
 .parallel-gruppe-label{
   padding:2px 6px 6px; display:flex; align-items:center; gap:6px;
@@ -318,8 +380,8 @@ main{
 .parallel-gruppe .schritt{ margin-bottom:4px; }
 .parallel-gruppe .schritt:last-child{ margin-bottom:0; }
 .parallel-badge{
-  font-size:10px; font-family:'IBM Plex Mono',monospace;
-  color:#fff; background:var(--accent,#5B6FA8); border-radius:3px;
+  font-size:10px; font-family:var(--ci-schrift-mono);
+  color:var(--flaeche); background:var(--accent,var(--accent)); border-radius:3px;
   padding:1px 5px; flex-shrink:0; white-space:nowrap;
 }
 
@@ -336,7 +398,7 @@ main{
 }
 .admin-section:last-child{ border-bottom:none; }
 .admin-section h3{
-  font-family:'Space Grotesk',sans-serif; font-size:15px;
+  font-family:var(--ci-schrift); font-size:15px;
   font-weight:700; margin:0 0 14px; color:var(--ink);
 }
 .admin-tabelle{
@@ -344,7 +406,7 @@ main{
 }
 .admin-tabelle th{
   text-align:left; padding:7px 10px; border-bottom:2px solid var(--line);
-  font-family:'IBM Plex Mono',monospace; font-size:10.5px;
+  font-family:var(--ci-schrift-mono); font-size:10.5px;
   text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
   font-weight:500;
 }
@@ -357,34 +419,34 @@ main{
 /* Prozess-Karten im Admin */
 .prozess-karten{ display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
 .prozess-karte{
-  background:#fff; border:1px solid var(--line); border-radius:10px;
+  background:var(--flaeche); border:1px solid var(--line); border-radius:10px;
   padding:16px; display:flex; flex-direction:column; gap:8px;
 }
 .prozess-karte-titel{
-  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+  font-family:var(--ci-schrift); font-weight:700; font-size:15px;
 }
 .prozess-karte-meta{ font-size:12px; color:var(--muted); }
 .prozess-karte-badges{ display:flex; gap:6px; flex-wrap:wrap; }
 .badge{
   font-size:10.5px; padding:2px 8px; border-radius:4px;
-  font-family:'IBM Plex Mono',monospace; font-weight:500;
+  font-family:var(--ci-schrift-mono); font-weight:500;
 }
-.badge-oeffentlich{ background:#e8f5e9; color:#2e7d32; }
-.badge-privat{ background:#fce4ec; color:#c62828; }
+.badge-oeffentlich{ background:var(--m-oeffentlich-bg); color:var(--m-oeffentlich); }
+.badge-privat{ background:var(--m-privat-bg); color:var(--m-privat); }
 .badge-schritte{ background:var(--paper-2); color:var(--muted); }
 
 /* Sichtbarkeit-Toggle */
 .sichtbarkeit-toggle{
   display:flex; align-items:center; gap:10px; padding:12px 14px;
-  background:#fff; border:1px solid var(--line); border-radius:8px;
+  background:var(--flaeche); border:1px solid var(--line); border-radius:8px;
   margin-bottom:14px; cursor:pointer;
 }
 .sichtbarkeit-toggle input{ accent-color:var(--accent); width:16px; height:16px; cursor:pointer; }
 .sichtbarkeit-label{ font-size:13.5px; color:var(--ink); }
 .sichtbarkeit-hint{ font-size:12px; color:var(--muted); }
 
-.badge-verantwortlich{ background:#e3f2fd; color:#1565c0; }
-.badge-mitarbeitend{ background:#f3e5f5; color:#6a1b9a; }
+.badge-verantwortlich{ background:var(--m-verantwortlich-bg); color:var(--m-verantwortlich); }
+.badge-mitarbeitend{ background:var(--m-mitarbeitend-bg); color:var(--m-mitarbeitend); }
 .prozess-badges-zelle{ max-width:220px; }
 .prozess-badges-zelle .badge{ margin:1px 2px; display:inline-block; }
 
@@ -392,11 +454,11 @@ main{
 .instanz-schritte-liste{ display:flex; flex-direction:column; gap:4px; }
 .instanz-phase-titel{
   font-size:11.5px; font-weight:700; text-transform:uppercase;
-  letter-spacing:.04em; margin:12px 0 4px; font-family:'IBM Plex Mono',monospace;
+  letter-spacing:.04em; margin:12px 0 4px; font-family:var(--ci-schrift-mono);
 }
 .instanz-schritt-zeile{
   display:flex; align-items:center; gap:8px; padding:6px 10px;
-  background:#fff; border:1px solid var(--line); border-radius:6px;
+  background:var(--flaeche); border:1px solid var(--line); border-radius:6px;
 }
 .instanz-schritt-zeile.deaktiviert{
   opacity:.5; background:var(--paper-2);
@@ -432,11 +494,11 @@ main{
 }
 .vorlage-tab{
   font-size:12px; padding:4px 12px; border:1px solid var(--line);
-  border-radius:6px; background:#fff; cursor:pointer; color:var(--muted);
+  border-radius:6px; background:var(--flaeche); cursor:pointer; color:var(--muted);
   transition:all .15s;
 }
 .vorlage-tab:hover{ border-color:var(--accent); color:var(--ink); }
-.vorlage-tab.aktiv{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.vorlage-tab.aktiv{ background:var(--accent); color:var(--flaeche); border-color:var(--accent); }
 
 /* ============================================================
    Einstellungen / Erscheinungsbild
@@ -445,7 +507,7 @@ main{
 @media (max-width:640px){ .einst-grid{ grid-template-columns:1fr; } }
 .einst-gruppe{ display:flex; flex-direction:column; gap:4px; }
 .einst-label{
-  font-family:'IBM Plex Mono',monospace; font-size:10px;
+  font-family:var(--ci-schrift-mono); font-size:10px;
   text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
 }
 .einst-gruppe input[type="text"]{
@@ -457,14 +519,14 @@ main{
 .einst-farb-zeile input{ flex:1; }
 .einst-farb-vorschau{
   width:36px; height:36px; border-radius:7px;
-  border:2px solid rgba(0,0,0,.1); flex-shrink:0;
+  border:2px solid var(--schatten-1); flex-shrink:0;
 }
 .einst-logo-zeile{
   display:flex; align-items:center; gap:12px; margin-top:6px;
 }
 .einst-logo-vorschau{
   height:40px; width:auto; border-radius:6px;
-  border:1px solid var(--line); background:#fff; padding:4px;
+  border:1px solid var(--line); background:var(--flaeche); padding:4px;
 }
 .einst-aktionen{
   display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:16px;
@@ -491,12 +553,12 @@ main{
   flex:1; border:none; background:transparent; font-size:13.5px;
   font-weight:700; color:var(--phase-farbe); padding:2px 4px; border-radius:4px;
 }
-.phasen-name-feld:focus{ background:#fff; outline:1px solid var(--phase-farbe); }
+.phasen-name-feld:focus{ background:var(--flaeche); outline:1px solid var(--phase-farbe); }
 .phasen-nummer{ font-weight:700; font-size:13px; flex-shrink:0; }
 
 /* Farbauswahl */
 .farbwahl{
-  padding:8px; background:#fff; border:1px solid var(--line);
+  padding:8px; background:var(--flaeche); border:1px solid var(--line);
   border-radius:8px; width:220px;
 }
 .farbwahl-palette{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; }
@@ -505,23 +567,23 @@ main{
   cursor:pointer; padding:0; transition:transform .1s;
 }
 .farbwahl-kaestchen:hover{ transform:scale(1.15); }
-.farbwahl-kaestchen.aktiv{ border-color:#fff; outline:2px solid #333; }
+.farbwahl-kaestchen.aktiv{ border-color:var(--flaeche); outline:2px solid var(--ink); }
 .farbwahl-eigene{ display:flex; align-items:center; gap:6px; }
 .farbwahl-vorschau{ width:28px; height:28px; border-radius:5px; border:1px solid var(--line); flex-shrink:0; }
 .farbwahl-hex{
   flex:1; font-size:12px; padding:4px 6px; border:1px solid var(--line);
-  border-radius:5px; font-family:'IBM Plex Mono',monospace;
+  border-radius:5px; font-family:var(--ci-schrift-mono);
 }
 .farb-popup{
   position:absolute; top:28px; left:0; z-index:100;
-  box-shadow:0 4px 16px rgba(0,0,0,.15); border-radius:8px;
+  box-shadow:0 4px 16px var(--schatten-2); border-radius:8px;
 }
 .neue-phase-form{ display:flex; flex-direction:column; gap:6px; }
 
 /* Vorlagen */
 .vorlagen-liste{ display:flex; flex-direction:column; gap:4px; padding:4px 6px 6px; }
 .vorlagen-zeile-wrapper{
-  background:#fff; border:1px solid var(--line); border-radius:6px; cursor:grab;
+  background:var(--flaeche); border:1px solid var(--line); border-radius:6px; cursor:grab;
 }
 .vorlagen-zeile-wrapper.wird-gezogen{ opacity:.4; }
 .vorlagen-zeile-wrapper.inaktiv{ opacity:.45; }
@@ -543,19 +605,19 @@ main{
 .md-toolbar{ display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap; }
 .md-toolbar button{
   font-size:11px; padding:3px 8px; border:1px solid var(--line);
-  border-radius:5px; background:#fff; cursor:pointer; color:var(--ink);
+  border-radius:5px; background:var(--flaeche); cursor:pointer; color:var(--ink);
 }
 .md-toolbar button:hover{ background:var(--paper); }
 .vorlagen-vorschau{
   font-size:13px; line-height:1.5; padding:8px 10px;
-  border:1px dashed var(--line); border-radius:6px; background:#fff;
+  border:1px dashed var(--line); border-radius:6px; background:var(--flaeche);
 }
 
 /* Snapshots */
 .vorlagen-set-zeile{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:10px 12px; border:1px solid var(--line); border-radius:8px;
-  background:#fff; margin-bottom:6px;
+  background:var(--flaeche); margin-bottom:6px;
 }
 
 /* ============================================================
@@ -564,10 +626,10 @@ main{
 .zeitstrahl-tabs{ display:flex; align-items:center; gap:6px; margin-bottom:14px; }
 .zt-tab{
   font-size:12.5px; padding:5px 14px; border:1px solid var(--line);
-  border-radius:6px; background:#fff; cursor:pointer; color:var(--muted);
+  border-radius:6px; background:var(--flaeche); cursor:pointer; color:var(--muted);
   transition:all .15s;
 }
-.zt-tab.aktiv{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.zt-tab.aktiv{ background:var(--accent); color:var(--flaeche); border-color:var(--accent); }
 .gantt-zoom{
   display:flex; align-items:center; gap:10px; margin-bottom:10px;
   font-size:12px; color:var(--muted);
@@ -579,7 +641,7 @@ main{
 .gantt-th{
   font-size:9px; color:var(--muted); text-align:center;
   padding:3px 1px; border-bottom:1px solid var(--line);
-  font-family:'IBM Plex Mono',monospace; font-weight:400;
+  font-family:var(--ci-schrift-mono); font-weight:400;
   overflow:hidden; white-space:nowrap;
 }
 .gantt-th.gantt-heute{ color:var(--accent); font-weight:700; }
@@ -592,10 +654,10 @@ main{
 .gantt-schritt-label{ color:var(--ink); }
 .gantt-schritt-label.erledigt{ color:var(--muted); text-decoration:line-through; }
 .gantt-zelle{
-  height:22px; border-left:1px solid #eee;
+  height:22px; border-left:1px solid var(--line);
   vertical-align:middle; padding:0; position:relative;
 }
-.gantt-heute-spalte{ background:rgba(91,111,168,.06); }
+.gantt-heute-spalte{ background:var(--accent-flaeche); }
 .gantt-phase-tr .gantt-zelle{ height:28px; }
 .gantt-balken{ height:10px; margin:auto 0; }
 .gantt-punkt{ width:12px; height:12px; border-radius:50%; margin:0 auto; }
@@ -603,34 +665,34 @@ main{
 .gantt-balken-mitte{ border-radius:0; width:100%; height:10px; }
 .gantt-balken-ende{ border-radius:0 5px 5px 0; width:75%; }
 .gantt-erledigt{ opacity:.35; }
-.gantt-ueberfaellig{ outline:2px solid #c0392b; outline-offset:1px; border-radius:3px; }
+.gantt-ueberfaellig{ outline:2px solid var(--gefahr); outline-offset:1px; border-radius:3px; }
 
 /* Timeline */
 .timeline{ position:relative; padding:8px 0; }
 .tl-datum-zeile{ display:flex; align-items:center; gap:8px; margin:12px 0 4px; }
 .tl-datum-linie{ flex:1; height:1px; background:var(--line); }
 .tl-datum-label{
-  font-size:11px; font-family:'IBM Plex Mono',monospace;
+  font-size:11px; font-family:var(--ci-schrift-mono);
   color:var(--muted); white-space:nowrap;
 }
 .tl-datum-label.tl-heute{ color:var(--accent); font-weight:700; }
-.tl-datum-label.tl-vergangenheit{ color:#c0392b; }
+.tl-datum-label.tl-vergangenheit{ color:var(--gefahr); }
 .tl-eintrag{
   display:flex; align-items:flex-start; gap:10px;
   padding:5px 0 5px 6px; border-left:2px solid var(--accent,var(--accent));
   margin-left:10px; margin-bottom:2px;
 }
-.tl-eintrag.tl-erledigt{ opacity:.5; border-left-color:#ccc; }
-.tl-eintrag.tl-ueberfaellig{ border-left-color:#c0392b; }
+.tl-eintrag.tl-erledigt{ opacity:.5; border-left-color:var(--line); }
+.tl-eintrag.tl-ueberfaellig{ border-left-color:var(--gefahr); }
 .tl-punkt{
   width:8px; height:8px; border-radius:50%;
   background:var(--accent,var(--accent)); flex-shrink:0;
   margin-top:3px; margin-left:-14px;
 }
-.tl-eintrag.tl-erledigt .tl-punkt{ background:#ccc; }
-.tl-eintrag.tl-ueberfaellig .tl-punkt{ background:#c0392b; }
+.tl-eintrag.tl-erledigt .tl-punkt{ background:var(--line); }
+.tl-eintrag.tl-ueberfaellig .tl-punkt{ background:var(--gefahr); }
 .tl-inhalt{ display:flex; flex-wrap:wrap; align-items:center; gap:4px; flex:1; }
-.tl-phase{ font-size:10px; font-family:'IBM Plex Mono',monospace; flex-shrink:0; }
+.tl-phase{ font-size:10px; font-family:var(--ci-schrift-mono); flex-shrink:0; }
 .tl-titel{ font-size:13px; }
 .tl-meta{ font-size:11px; color:var(--muted); }
 
@@ -640,24 +702,24 @@ main{
 .hilfe-schritte{ display:flex; flex-direction:column; gap:12px; margin-top:16px; }
 .hilfe-karte{
   display:flex; gap:16px; padding:16px 18px;
-  background:#fff; border:1px solid var(--line); border-radius:10px;
+  background:var(--flaeche); border:1px solid var(--line); border-radius:10px;
 }
 .hilfe-karte-nr{ font-size:24px; flex-shrink:0; width:36px; text-align:center; }
 .hilfe-karte-inhalt{ flex:1; }
 .hilfe-karte-titel{
-  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14.5px;
+  font-family:var(--ci-schrift); font-weight:700; font-size:14.5px;
   margin:0 0 6px; color:var(--ink);
 }
 .hilfe-karte-text{ font-size:13.5px; line-height:1.6; margin:0; color:var(--muted); }
 
 /* FAQ */
 .hilfe-faq{ margin-top:16px; display:flex; flex-direction:column; gap:6px; }
-.faq-item{ border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
+.faq-item{ border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--flaeche); }
 .faq-frage{
   width:100%; display:flex; justify-content:space-between; align-items:center;
   padding:13px 16px; background:none; border:none; cursor:pointer; text-align:left;
   font-size:13.5px; font-weight:600; color:var(--ink); gap:10px;
-  font-family:'Inter',system-ui,sans-serif;
+  font-family:var(--ci-schrift);
 }
 .faq-frage:hover{ background:var(--paper); }
 .faq-chev{ color:var(--muted); font-size:11px; transition:transform .2s; flex-shrink:0; }
@@ -705,7 +767,7 @@ footer{
 }
 .handbuch-section:last-child{ border-bottom:none; }
 .handbuch-h3{
-  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+  font-family:var(--ci-schrift); font-weight:700; font-size:15px;
   margin:0 0 10px; color:var(--ink);
 }
 .handbuch-inhalt{
@@ -724,11 +786,11 @@ footer{
   #app-shell, .prozess-leiste, .kein-druck,
   footer, .export-leiste, .chev, .felder label{ display:none !important; }
   @page{ margin:20mm 15mm; }
-  body{ background:#fff; font-size:11pt; }
+  body{ background:var(--flaeche); font-size:11pt; }
   main{ max-width:100%; padding:0; }
   .schritt-detail{ display:block !important; padding:0 0 6pt 24pt; }
   .schritt{
-    border:0.5pt solid #ccc; border-left:3pt solid var(--accent,#5B6FA8);
+    border:0.5pt solid var(--line); border-left:3pt solid var(--accent,var(--accent));
     margin-bottom:4pt; page-break-inside:avoid;
   }
   .schritt-zeile{ padding:6pt 8pt; }

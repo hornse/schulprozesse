@@ -497,6 +497,26 @@ function render() {
   } else {
     $app.appendChild(renderDashboard());
   }
+
+  fokusAufInhalt();
+}
+
+/**
+ * Setzt den Fokus auf den Hauptbereich.
+ *
+ * Die Anwendung tauscht ihre Ansicht aus, statt die Seite neu zu laden.
+ * Ohne diesen Sprung bliebe der Tastaturfokus dort, wo er war – meist
+ * auf einem Navigationsknopf –, und Bildschirmleser bekaemen vom
+ * Wechsel gar nichts mit. tabindex="-1" am <main> macht den Sprung
+ * moeglich, ohne den Bereich in die Tabulatorreihenfolge aufzunehmen.
+ *
+ * Nicht beim allerersten Aufbau: Dort soll der Fokus dort bleiben, wo
+ * der Browser ihn setzt.
+ */
+let ersterAufbau = true;
+function fokusAufInhalt() {
+  if (ersterAufbau) { ersterAufbau = false; return; }
+  $app?.focus({ preventScroll: true });
 }
 
 function renderShell() {

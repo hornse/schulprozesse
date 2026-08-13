@@ -73,6 +73,58 @@ grep -q 'vendor/ci-css/ci-tokens.css' "$HTML" \
     && gruen "Tokens eingebunden" || rot "Tokens nicht eingebunden"
 
 echo ""
+echo "Gerüst"
+grep -q 'ci-huelle--kopf' "$HTML" \
+    && gruen "Kopfleisten-Variante eingebunden" || rot "kein ci-huelle--kopf"
+for D in ci-komponenten.css ci-shell.css ci-shell.js ci-icons.svg; do
+    [ -f "backend/public/vendor/ci-css/$D" ] && gruen "$D vendored" || rot "$D fehlt"
+done
+grep -q 'ci-shell.js' "$HTML" \
+    && gruen "ci-shell.js eingebunden" || rot "ci-shell.js fehlt"
+grep -q "aria-current" "$JS" \
+    && gruen "aktiver Punkt über aria-current" || rot "aktiver Punkt nur über Klasse"
+grep -qE '^#app-shell|^\.shell-brand|^\.nav-tab' "$CSS" \
+    && rot "eigene Shell-Regeln noch vorhanden" || gruen "keine doppelten Shell-Regeln"
+# Entschieden: helle Leiste in allen fünf Anwendungen.
+grep -q 'ci-leiste--farbig' "$HTML" \
+    && rot "farbige Leiste – entschieden ist hell für alle" \
+    || gruen "helle Leiste wie in der übrigen Reihe"
+# Die Prozess-Tabs kennt kein anderes Projekt und bleiben hier.
+grep -q '^\.prozess-leiste' "$CSS" \
+    && gruen "Prozess-Tabs bleiben projekteigen" || rot "Prozess-Tabs verschwunden"
+grep -q 'logoAnzeigen' "$JS" \
+    && gruen "Logo wird nach dem Laden eingeblendet" || rot "kein Logo-Umschalter"
+
+FEHLENDE=""
+for N in $(grep -oE "ci-i-[a-z]+" "$JS" "$HTML" | sed 's/.*://' | sort -u); do
+    grep -q "id=\"$N\"" backend/public/vendor/ci-css/ci-icons.svg || FEHLENDE="$FEHLENDE $N"
+done
+[ -z "$FEHLENDE" ] && gruen "alle benutzten Symbole existieren im Sprite" \
+    || rot "im Sprite fehlen:$FEHLENDE"
+
+# app.js setzt Klassen, die das Modul NICHT kennt (btn, admin-section …).
+# Wer eine Regel dafür löscht, weil „das Modul das abdeckt", steht ohne
+# Gestaltung da – genau das ist bei fachkonferenzen passiert.
+#
+# Die folgenden sieben Klassen waren schon vor dem Umbau (Stand
+# 0e6f344) ohne Regel und werden auch nicht per querySelector gesucht.
+# Vermutlich Überbleibsel. Sie hier zu melden hieße, Bestandszustand
+# als Fehler auszugeben – deshalb ausgenommen und benannt, statt die
+# Prüfung insgesamt weicher zu machen.
+OHNE_REGEL_BEKANNT="dash-schuljahr gantt-schritt-tr hilfe-inhalt \
+neuer-schritt-titel phasen-farb-btn prozess-tabs zeitstrahl-inhalt"
+
+NUTZT=$(grep -oE "className *= *'[a-z][a-z0-9 _-]*'" "$JS" | sed "s/.*'\(.*\)'/\1/" \
+        | tr ' ' '\n' | sort -u | grep -vE '^(ci-|$)')
+FEHLT=""
+for K in $NUTZT; do
+    case " $OHNE_REGEL_BEKANNT " in *" $K "*) continue ;; esac
+    grep -qE "\\.$K[ ,.{:]" "$CSS" || FEHLT="$FEHLT $K"
+done
+[ -z "$FEHLT" ] && gruen "alle gestylten Klassen haben weiterhin ihre Regel" \
+    || rot "Regel entfallen für:$FEHLT"
+
+echo ""
 echo "Behobene Mängel"
 grep -q 'class="skip-link"' "$HTML" && gruen "Sprungmarke vorhanden" || rot "keine Sprungmarke"
 grep -q 'id="app" tabindex="-1"' "$HTML" \
@@ -81,7 +133,9 @@ grep -q "fokusAufInhalt" "$JS" \
     && gruen "Fokus springt nach dem Ansichtswechsel" || rot "kein Fokussprung"
 grep -q 'aria-label="Hauptnavigation"' "$HTML" \
     && gruen "Navigation ist benannt" || rot "Navigation ohne aria-label"
-grep -q 'id="shell-logo".*alt=""' "$HTML" \
+# Das <img> steht seit v2.4.0 über mehrere Zeilen; deshalb über die
+# ganze Datei prüfen statt zeilenweise.
+perl -0777 -ne 'exit(!(/id="shell-logo"[^>]*alt=""/s))' "$HTML" \
     && gruen "Logo ist als dekorativ ausgezeichnet" || rot "alt am Logo prüfen"
 grep -q -- '--accent:var(--ci-akzent)' "$CSS" \
     && gruen "--accent nutzt das Token (6.93 statt 4.46)" || rot "--accent mit eigenem Wert"

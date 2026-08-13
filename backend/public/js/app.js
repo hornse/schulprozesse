@@ -519,25 +519,46 @@ function fokusAufInhalt() {
   $app?.focus({ preventScroll: true });
 }
 
+/**
+ * Zeigt das Schullogo, sobald eines hinterlegt ist.
+ *
+ * Vorher stand das Bild fest im HTML und wurde per onerror wieder
+ * versteckt – ein Umweg, der bei jedem Aufruf einen 404 erzeugte,
+ * wenn kein Logo hinterlegt war. Jetzt entscheidet das Ladeergebnis,
+ * und der Platzhalter mit dem Anfangsbuchstaben bleibt sonst stehen.
+ */
+function logoAnzeigen() {
+  const bild = document.getElementById('shell-logo');
+  const platz = document.getElementById('shell-platzhalter');
+  if (!bild || !platz) return;
+  bild.addEventListener('load', () => {
+    if (bild.naturalWidth > 0) { bild.hidden = false; platz.hidden = true; }
+  });
+  bild.addEventListener('error', () => { bild.hidden = true; platz.hidden = false; });
+}
+
 function renderShell() {
   // ---- Benutzer-Bereich oben rechts ----
+  $shellUser.innerHTML = '';
   if (STATE.user) {
-    $shellUser.innerHTML = '';
-    const wrap = document.createElement('div');
-    wrap.className = 'shell-user';
-    wrap.innerHTML = `
-      <span class="shell-user-name">${STATE.user.anzeigename}</span>
-      <span class="shell-user-rolle rolle-${STATE.user.rolle}">${STATE.user.rolle}</span>`;
+    const name = document.createElement('span');
+    name.textContent = STATE.user.anzeigename;
+    $shellUser.appendChild(name);
+
+    const rolle = document.createElement('span');
+    rolle.className = 'ci-marke'
+      + (STATE.user.rolle === 'admin' ? ' ci-marke--akzent' : '');
+    rolle.textContent = STATE.user.rolle;
+    $shellUser.appendChild(rolle);
+
     const abmelden = document.createElement('button');
-    abmelden.className = 'shell-abmelden';
+    abmelden.className = 'ci-knopf ci-knopf--leise ci-knopf--klein';
     abmelden.textContent = 'Abmelden';
     abmelden.addEventListener('click', doLogout);
-    wrap.appendChild(abmelden);
-    $shellUser.appendChild(wrap);
+    $shellUser.appendChild(abmelden);
   } else {
-    $shellUser.innerHTML = '';
     const btn = document.createElement('button');
-    btn.className = 'shell-anmelden';
+    btn.className = 'ci-knopf ci-knopf--klein';
     btn.textContent = 'Anmelden';
     btn.addEventListener('click', () => { STATE.ansicht = 'login'; render(); });
     $shellUser.appendChild(btn);
@@ -546,23 +567,50 @@ function renderShell() {
   // ---- Navigation ----
   $shellNav.innerHTML = '';
 
-  // Hilfsfunktion: Nav-Tab anlegen
-  function navTab(id, icon, label) {
+  /**
+   * Ein Navigationspunkt.
+   *
+   * Der aktive Punkt wird über aria-current markiert statt über eine
+   * Klasse: ci-shell.css und Bildschirmleser lesen dasselbe Attribut,
+   * der Zustand ist damit nicht nur sichtbar, sondern auch hörbar.
+   *
+   * Das Symbol kommt aus dem Sprite von ci-css statt als Zeichen
+   * (◎ ☑ ◫ ⚙ ⚡). Solche Unicode-Zeichen sehen je nach Schrift und
+   * Betriebssystem verschieden aus und lassen sich nicht einfärben.
+   * In der waagerechten Leiste blendet ci-shell.css sie ohnehin aus –
+   * sichtbar werden sie erst im aufgeklappten Zustand.
+   */
+  function navTab(id, symbol, label) {
     const btn = document.createElement('button');
-    btn.className = 'nav-tab' + (STATE.ansicht === id ? ' aktiv' : '');
-    btn.innerHTML = `<span class="nav-icon">${icon}</span>${label}`;
+    btn.type = 'button';
+    if (STATE.ansicht === id) btn.setAttribute('aria-current', 'page');
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'ci-symbol');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#ci-i-' + symbol);
+    svg.appendChild(use);
+    btn.appendChild(svg);
+
+    const text = document.createElement('span');
+    text.className = 'ci-nav-text';
+    text.textContent = label;
+    btn.appendChild(text);
+
     btn.addEventListener('click', () => { STATE.ansicht = id; render(); });
     $shellNav.appendChild(btn);
   }
   function navSep() {
-    const sep = document.createElement('div'); sep.className = 'nav-sep';
+    const sep = document.createElement('div');
+    sep.className = 'ci-nav-trenner';
     $shellNav.appendChild(sep);
   }
 
   // Immer sichtbare Tabs
-  navTab('dashboard',  '◎', 'Dashboard');
-  if (STATE.user) navTab('checkliste', '☑', 'Checkliste');
-  navTab('zeitstrahl', '◫', 'Zeitstrahl');
+  navTab('dashboard',  'uebersicht', 'Dashboard');
+  if (STATE.user) navTab('checkliste', 'haken', 'Checkliste');
+  navTab('zeitstrahl', 'kalender', 'Zeitstrahl');
 
   // Prozess verwalten – nur wenn eingeloggt UND für mind. einen Prozess verantwortlich
   // (Admins sind implizit verantwortlich für alle)
@@ -572,18 +620,18 @@ function renderShell() {
     );
     if (verantwortlicheProzesse.length > 0) {
       navSep();
-      navTab('prozess-verwalten', '⚙', 'Prozess verwalten');
+      navTab('prozess-verwalten', 'einstellungen', 'Prozess verwalten');
     }
   }
 
   // Admin – separater Tab, unabhängig von Prozess-Tabs
   if (STATE.user?.rolle === 'admin') {
-    navTab('admin', '⚡', 'Admin');
+    navTab('admin', 'personen', 'Admin');
   }
 
   // Hilfe – immer sichtbar, ganz rechts
   navSep();
-  navTab('hilfe', '?', 'Hilfe');
+  navTab('hilfe', 'hilfe', 'Hilfe');
 }
 
 function renderProzessLeiste() {
@@ -3552,6 +3600,7 @@ function renderHandbuch(schulname) {
 }
 
 (async function start() {
+  logoAnzeigen();
   await ladePublicDashboard();
   await checkAuth();
   if (STATE.user) {

@@ -88,78 +88,36 @@ body{
 }
 
 /* ============================================================
-   App-Shell: Header + Nav in einer kompakten Leiste
+   App-Shell
+
+   Kopfleiste und Navigation kommen seit v2.4.0 aus ci-shell.css
+   (Variante .ci-huelle--kopf). Die früheren rund 60 Zeilen für
+   #app-shell, .shell-brand, .shell-nav, .nav-tab und Verwandte sind
+   entfallen.
+
+   Die Leiste war dunkel und zweizeilig; sie ist jetzt hell und
+   einzeilig – entschieden für alle fünf Anwendungen der Reihe. Die
+   Akzentfarbe markiert den aktiven Punkt, statt die Fläche zu füllen.
+
+   Die Prozess-Tabs darunter bleiben projekteigen: Das kennt keine
+   andere Anwendung.
    ============================================================ */
-#app-shell{
-  position:sticky; top:0; z-index:200;
-  background:var(--ink); color:var(--flaeche);
-  box-shadow:0 2px 8px var(--schatten-2);
-}
-
-/* Zeile 1: Marke + Benutzer */
-.shell-brand{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:0 28px; height:44px; border-bottom:1px solid var(--auf-dunkel-1);
-}
-.brand-left{ display:flex; align-items:center; }
-.brand-text{
-  font-family:var(--ci-schrift-mono); font-size:11px;
-  letter-spacing:.1em; text-transform:uppercase; color:var(--auf-dunkel-3);
-}
-.brand-text strong{ color:var(--flaeche); letter-spacing:.06em; }
-.shell-user{
-  display:flex; align-items:center; gap:10px; font-size:13px;
-}
-.shell-user-name{ color:var(--flaeche); font-weight:500; }
-.shell-user-rolle{
-  font-size:9px; font-family:var(--ci-schrift-mono); text-transform:uppercase;
-  padding:2px 7px; border-radius:3px; letter-spacing:.05em;
-  background:var(--auf-dunkel-2); color:var(--flaeche);
-}
-.shell-user-rolle.rolle-admin{ background:var(--accent); }
-.shell-abmelden{
-  font-size:12px; padding:4px 10px; border-radius:5px;
-  border:1px solid var(--auf-dunkel-3); background:transparent;
-  color:var(--flaeche); cursor:pointer; transition:all .15s;
-}
-.shell-abmelden:hover{ background:var(--auf-dunkel-1); color:var(--flaeche); }
-.shell-anmelden{
-  font-size:12px; padding:4px 12px; border-radius:5px;
-  border:1px solid var(--auf-dunkel-3); background:var(--auf-dunkel-1);
-  color:var(--flaeche); cursor:pointer; transition:all .15s;
-}
-.shell-anmelden:hover{ background:var(--auf-dunkel-2); }
-
-/* Zeile 2: Hauptnavigation */
-.shell-nav{
-  display:flex; align-items:center; gap:2px;
-  padding:0 22px; height:var(--nav-h);
-  overflow-x:auto; scrollbar-width:none;
-}
-.shell-nav::-webkit-scrollbar{ display:none; }
-.nav-tab{
-  display:flex; align-items:center; gap:6px;
-  padding:0 14px; height:var(--nav-h); border:none; background:transparent;
-  color:var(--auf-dunkel-3); font-size:13.5px; font-weight:500;
-  cursor:pointer; white-space:nowrap; border-bottom:3px solid transparent;
-  transition:color .15s, border-color .15s;
-  font-family:var(--ci-schrift);
-}
-.nav-tab:hover{ color:var(--flaeche); }
-.nav-tab.aktiv{ color:var(--flaeche); border-bottom-color:var(--flaeche); }
-.nav-tab .nav-icon{ font-size:15px; }
-.nav-sep{
-  width:1px; height:20px; background:var(--auf-dunkel-1);
-  margin:0 6px; flex-shrink:0;
-}
 
 /* ============================================================
    Prozess-Tabs (unter dem Header)
    ============================================================ */
 .prozess-leiste{
   background:var(--paper-2); border-bottom:1px solid var(--line);
-  padding:0 28px; display:flex; gap:4px; overflow-x:auto;
+  display:flex; gap:4px; overflow-x:auto;
   scrollbar-width:none;
+}
+/* Fluchtet mit Kopfleiste und Inhalt. Ohne die Begrenzung liefe die
+   Tab-Zeile über die ganze Fensterbreite, während alles darüber und
+   darunter bei 76rem endet. */
+.prozess-leiste > *{ flex:0 0 auto; }
+.prozess-leiste{
+  padding:0 1.5rem;
+  max-width:var(--ci-inhalt-breite); margin:0 auto; width:100%;
 }
 .prozess-leiste::-webkit-scrollbar{ display:none; }
 .prozess-tab{
@@ -747,10 +705,7 @@ footer{
    Mobilansicht
    ============================================================ */
 @media (max-width:640px){
-  .shell-brand{ padding:0 14px; }
-  .shell-nav{ padding:0 10px; }
-  .nav-tab{ padding:0 10px; font-size:12px; }
-  .prozess-leiste{ padding:0 10px; }
+  .prozess-leiste{ padding:0 1rem; }
   main{ padding:14px 16px; }
   .gantt-label-zelle{ min-width:120px; max-width:120px; }
   .felder{ flex-direction:column; }
@@ -783,7 +738,7 @@ footer{
    Print
    ============================================================ */
 @media print{
-  #app-shell, .prozess-leiste, .kein-druck,
+  .ci-leiste, .prozess-leiste, .kein-druck,
   footer, .export-leiste, .chev, .felder label{ display:none !important; }
   @page{ margin:20mm 15mm; }
   body{ background:var(--flaeche); font-size:11pt; }

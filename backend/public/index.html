@@ -8,6 +8,8 @@
      style.css im Zweifel, und die Werte kommen dennoch aus einer
      Quelle. -->
 <link rel="stylesheet" href="vendor/ci-css/ci-tokens.css?v=DEV">
+<link rel="stylesheet" href="vendor/ci-css/ci-komponenten.css?v=DEV">
+<link rel="stylesheet" href="vendor/ci-css/ci-shell.css?v=DEV">
 <link rel="stylesheet" href="css/style.css?v=DEV">
 </head>
 <body>
@@ -15,34 +17,57 @@
 <a href="#app" class="skip-link">Zum Inhalt springen</a>
 
 
-<!-- App-Shell: sticky Header mit Navigation -->
-<div id="app-shell">
-  <div class="shell-brand">
-    <div class="brand-left">
-      <img id="shell-logo" src="/api/einstellungen/logo" alt=""
-           style="display:none;height:28px;width:auto;margin-right:10px;vertical-align:middle;"
-           onerror="this.style.display='none'">
-      <span class="brand-text" id="brand-text">Friedrich-Rückert-Gymnasium · <strong>Schulprozesse</strong></span>
+<!-- Gerüst aus hornse/ci-css, Variante Kopfleiste: sechs
+     Navigationspunkte. Die frühere zweizeilige dunkle Leiste ist einer
+     einzeiligen hellen gewichen – entschieden für alle fünf
+     Anwendungen der Reihe. -->
+<div class="ci-huelle ci-huelle--kopf" data-ci-huelle data-leiste="voll"
+     data-ci-icons="vendor/ci-css/ci-icons.svg?v=DEV">
+
+  <header class="ci-leiste">
+    <div class="ci-leiste-innen">
+      <div class="ci-schild">
+        <!-- Ist ein Logo hinterlegt, tritt es an die Stelle des
+             Platzhalters; app.js schaltet um, sobald /api/einstellungen/logo
+             ein Bild liefert. -->
+        <span class="ci-schild-platzhalter" id="shell-platzhalter" aria-hidden="true">S</span>
+        <img id="shell-logo" class="ci-schild-logo" src="/api/einstellungen/logo"
+             alt="" hidden>
+        <span class="ci-schild-text">
+          <span class="ci-schild-name" id="brand-titel">Schulprozesse</span>
+          <span class="ci-schild-schule" id="brand-text">Friedrich-Rückert-Gymnasium</span>
+        </span>
+      </div>
+
+      <button type="button" class="ci-menue-knopf" data-ci-menue aria-expanded="false">
+        <svg class="ci-symbol" aria-hidden="true"><use href="#ci-i-menue"></use></svg>
+        Menü
+      </button>
+
+      <nav class="ci-nav" id="shell-nav" aria-label="Hauptnavigation">
+        <!-- wird von app.js befüllt -->
+      </nav>
+      <div id="shell-user" class="ci-kopf-rechts"></div>
     </div>
-    <div id="shell-user"></div>
-  </div>
-  <nav class="shell-nav" id="shell-nav" aria-label="Hauptnavigation">
-    <!-- wird von app.js befüllt -->
-  </nav>
+  </header>
+
+  <!-- Prozess-Tabs. Bleiben projekteigen: Das kennt keine andere
+       Anwendung der Reihe, und ein Modul soll nichts mitschleppen,
+       was nur einer braucht. -->
+  <div id="prozess-leiste" style="display:none;" class="prozess-leiste"></div>
+
+  <main class="ci-inhalt">
+    <div class="ci-inhalt-innen" id="app" tabindex="-1">
+      <p class="ci-leer">Lädt…</p>
+    </div>
+  </main>
 </div>
-
-<!-- Prozess-Tabs (unter dem Header, nur wenn eingeloggt) -->
-<div id="prozess-leiste" style="display:none;" class="prozess-leiste"></div>
-
-<!-- Hauptinhalt -->
-<main id="app" tabindex="-1">
-  <p style="color:var(--muted);font-family:var(--ci-schrift-mono);font-size:13px;">Lädt…</p>
-</main>
 
 <footer>
   <span id="wer-bin-ich"></span>
 </footer>
 
+<script src="vendor/ci-css/ci-shell.js?v=DEV"></script>
 <script src="js/app.js?v=DEV"></script>
 </body>
 </html>

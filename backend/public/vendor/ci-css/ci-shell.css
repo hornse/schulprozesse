@@ -1,4 +1,4 @@
-/* VENDORED aus hornse/ci-css v1.4.0 – dort ändern, hierher kopieren! */
+/* VENDORED aus hornse/ci-css v1.4.1 – dort ändern, hierher kopieren! */
 /* ============================================================
    ci-shell.css – Gerüst der FRG-Projektreihe
    Stufe 3 von 3. Setzt ci-tokens.css voraus, ergänzt ci-komponenten.css.
@@ -77,6 +77,13 @@
     object-fit: contain;
     border-radius: var(--ci-radius);
 }
+
+/* Ohne diese Zeile bleibt ein Logo mit hidden-Attribut sichtbar: In
+   einem Flex-Behaelter setzt der Browser display auf block, und das
+   ueberschreibt die Vorgabe von hidden. Ergebnis waere Platzhalter
+   UND Logo nebeneinander. Gilt fuer beide gleichermassen. */
+.ci-schild-logo[hidden],
+.ci-schild-platzhalter[hidden] { display: none; }
 
 /* Platzhalter, solange kein Logo hinterlegt ist. */
 .ci-schild-platzhalter {

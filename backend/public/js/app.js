@@ -522,19 +522,30 @@ function fokusAufInhalt() {
 /**
  * Zeigt das Schullogo, sobald eines hinterlegt ist.
  *
- * Vorher stand das Bild fest im HTML und wurde per onerror wieder
- * versteckt – ein Umweg, der bei jedem Aufruf einen 404 erzeugte,
- * wenn kein Logo hinterlegt war. Jetzt entscheidet das Ladeergebnis,
- * und der Platzhalter mit dem Anfangsbuchstaben bleibt sonst stehen.
+ * WICHTIG: Nicht nur auf 'load' warten. Das src-Attribut steht im
+ * HTML, das Bild laedt also schon beim Parsen - wenn app.js seine
+ * Zuhoerer anhaengt, ist das Ereignis laengst vorbei und wird nie
+ * wieder ausgeloest. Ergebnis waere ein Platzhalter UND ein Logo
+ * nebeneinander. Deshalb zuerst complete/naturalWidth pruefen.
  */
 function logoAnzeigen() {
   const bild = document.getElementById('shell-logo');
   const platz = document.getElementById('shell-platzhalter');
   if (!bild || !platz) return;
+
+  const zeigen = () => { bild.hidden = false; platz.hidden = true; };
+  const verbergen = () => { bild.hidden = true; platz.hidden = false; };
+
+  // Fall 1: schon fertig geladen, als dieser Code lief.
+  if (bild.complete) {
+    if (bild.naturalWidth > 0) zeigen(); else verbergen();
+    return;
+  }
+  // Fall 2: laedt noch.
   bild.addEventListener('load', () => {
-    if (bild.naturalWidth > 0) { bild.hidden = false; platz.hidden = true; }
+    if (bild.naturalWidth > 0) zeigen(); else verbergen();
   });
-  bild.addEventListener('error', () => { bild.hidden = true; platz.hidden = false; });
+  bild.addEventListener('error', verbergen);
 }
 
 function renderShell() {

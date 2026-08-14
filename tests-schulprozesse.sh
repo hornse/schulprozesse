@@ -111,8 +111,12 @@ done
 # Vermutlich Überbleibsel. Sie hier zu melden hieße, Bestandszustand
 # als Fehler auszugeben – deshalb ausgenommen und benannt, statt die
 # Prüfung insgesamt weicher zu machen.
+# prozess-tabs stand hier, bis auffiel, dass die fehlende Regel die
+# Tab-Zeile der oeffentlichen Ansicht stapeln liess. Was auf dieser
+# Liste steht, gehoert regelmaessig ueberprueft - „war schon immer
+# ohne Regel" heisst nicht „braucht keine".
 OHNE_REGEL_BEKANNT="dash-schuljahr gantt-schritt-tr hilfe-inhalt \
-neuer-schritt-titel phasen-farb-btn prozess-tabs zeitstrahl-inhalt"
+neuer-schritt-titel phasen-farb-btn zeitstrahl-inhalt"
 
 NUTZT=$(grep -oE "className *= *'[a-z][a-z0-9 _-]*'" "$JS" | sed "s/.*'\(.*\)'/\1/" \
         | tr ' ' '\n' | sort -u | grep -vE '^(ci-|$)')

@@ -17,21 +17,24 @@ if [ -z "$MSG" ]; then
   exit 1
 fi
 
-# Cache-Busting-Timestamp aktualisieren (YYYYMMDDHHMM)
-TIMESTAMP=$(date +%Y%m%d%H%M)
-python3 - << PYEOF
-import re
-with open('backend/public/index.html', 'r') as f:
-    content = f.read()
-content = re.sub(r'\?v=\d+', f'?v=${TIMESTAMP}', content)
-with open('backend/public/index.html', 'w') as f:
-    f.write(content)
-print(f"Cache-Busting: ?v=${TIMESTAMP}")
-PYEOF
+# Cache-Busting-Timestamp aktualisieren
+# Ausdruck über beliebige Zeichen, nicht nur Ziffern: "\?v=\d+" traf das
+# "?v=DEV" im Auslieferungszustand nicht, das sed lief ins Leere, es gab
+# nichts zu committen, und unter "set -e" brach der Commit-Schritt vor dem
+# Push ab. Gefunden am 17.08.2026. Kein sed -i: BSD (macOS) und GNU
+# erwarten dort Verschiedenes.
+STEMPEL=$(date -u +%Y%m%d%H%M%S)
+sed "s/?v=[^\"']*/?v=$STEMPEL/g" backend/public/index.html > backend/public/index.html.neu
+mv backend/public/index.html.neu backend/public/index.html
+echo "Cache-Busting: ?v=$STEMPEL"
 
 # Committen und pushen
 git add -A
-git commit -m "$MSG"
+if ! git diff --cached --quiet; then
+  git commit -m "$MSG"
+else
+  echo "  (nichts zu committen)"
+fi
 git push github main && git push uberspace main
 
 echo ""

@@ -38,6 +38,20 @@ else
 fi
 
 echo ""
+echo "Gruppierung"
+if command -v node > /dev/null 2>&1; then
+    if node tests/gruppierung.test.js > /tmp/gruppierung-test.$$.log 2>&1; then
+        gruen "Phasen-Gruppierung ist robust gegen nicht zusammenhängende Zeilen"
+    else
+        rot "Phasen-Gruppierung erzeugt Dubletten (siehe tests/gruppierung.test.js)"
+        sed 's/^/      /' /tmp/gruppierung-test.$$.log
+    fi
+    rm -f /tmp/gruppierung-test.$$.log
+else
+    echo "  –  node nicht vorhanden"
+fi
+
+echo ""
 echo "Datenschutz"
 # Kommentare vorher entfernen: Die Erklärung, warum der @import weg ist,
 # darf nicht als Fund gelten.

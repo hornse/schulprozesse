@@ -451,6 +451,28 @@ function berechneParallelIds(liste) {
   return ids;
 }
 
+// Gruppiert eine flache Schrittliste nach Phase – unabhängig davon, ob
+// Zeilen derselben Phase in der Liste zusammenhängen (z. B. weil ein
+// nachträglich hinzugefügter Schritt eine Reihenfolge über den ganzen
+// Prozess statt je Phase bekommen hat). Reihenfolge der Gruppen = erstes
+// Vorkommen der Phase in der Liste; Reihenfolge innerhalb einer Gruppe =
+// Reihenfolge in der Ausgangsliste.
+function gruppiereNachPhase(liste) {
+  const gruppen = [];
+  const nachPhase = new Map();
+  for (const schritt of liste) {
+    let gruppe = nachPhase.get(schritt.phase);
+    if (!gruppe) {
+      gruppe = { phase: schritt.phase, phase_farbe: schritt.phase_farbe,
+                 phase_reihenfolge: schritt.phase_reihenfolge, schritte: [] };
+      nachPhase.set(schritt.phase, gruppe);
+      gruppen.push(gruppe);
+    }
+    gruppe.schritte.push(schritt);
+  }
+  return gruppen;
+}
+
 // ============================================================================
 // Rendering – Haupt-Render
 // ============================================================================
@@ -924,37 +946,35 @@ function renderChecklist() {
   container.appendChild(renderExportLeiste('checkliste'));
 
   const parallelIds = berechneParallelIds(STATE.schritte.filter((s) => !s.erledigt));
-  let aktuellePhase = null, aktiverParallelBlock = null, aktivesParallelDatum = null;
 
-  for (const schritt of STATE.schritte) {
-    if (schritt.phase !== aktuellePhase) {
-      aktuellePhase = schritt.phase;
-      if (aktiverParallelBlock) { container.appendChild(aktiverParallelBlock); aktiverParallelBlock = null; aktivesParallelDatum = null; }
-      const h = document.createElement('div');
-      h.className = 'phase-title'; h.style.color = schritt.phase_farbe;
-      h.textContent = phasenAnzeigeName(schritt.phase, schritt.phase_reihenfolge, STATE.schritte);
-      container.appendChild(h);
-    }
+  for (const gruppe of gruppiereNachPhase(STATE.schritte)) {
+    const h = document.createElement('div');
+    h.className = 'phase-title'; h.style.color = gruppe.phase_farbe;
+    h.textContent = phasenAnzeigeName(gruppe.phase, gruppe.phase_reihenfolge, STATE.schritte);
+    container.appendChild(h);
 
-    const istParallel = schritt.geplantes_datum && parallelIds.has(schritt.id);
-    if (istParallel && schritt.geplantes_datum === aktivesParallelDatum) {
-      aktiverParallelBlock.appendChild(renderSchritt(schritt));
-    } else {
-      if (aktiverParallelBlock) { container.appendChild(aktiverParallelBlock); aktiverParallelBlock = null; aktivesParallelDatum = null; }
-      if (istParallel) {
-        aktiverParallelBlock = document.createElement('div');
-        aktiverParallelBlock.className = 'parallel-gruppe';
-        const lbl = document.createElement('div'); lbl.className = 'parallel-gruppe-label';
-        lbl.innerHTML = `<span class="parallel-badge">⇉ parallel – ${formatDatum(schritt.geplantes_datum)}</span>`;
-        aktiverParallelBlock.appendChild(lbl);
+    let aktiverParallelBlock = null, aktivesParallelDatum = null;
+    for (const schritt of gruppe.schritte) {
+      const istParallel = schritt.geplantes_datum && parallelIds.has(schritt.id);
+      if (istParallel && schritt.geplantes_datum === aktivesParallelDatum) {
         aktiverParallelBlock.appendChild(renderSchritt(schritt));
-        aktivesParallelDatum = schritt.geplantes_datum;
       } else {
-        container.appendChild(renderSchritt(schritt));
+        if (aktiverParallelBlock) { container.appendChild(aktiverParallelBlock); aktiverParallelBlock = null; aktivesParallelDatum = null; }
+        if (istParallel) {
+          aktiverParallelBlock = document.createElement('div');
+          aktiverParallelBlock.className = 'parallel-gruppe';
+          const lbl = document.createElement('div'); lbl.className = 'parallel-gruppe-label';
+          lbl.innerHTML = `<span class="parallel-badge">⇉ parallel – ${formatDatum(schritt.geplantes_datum)}</span>`;
+          aktiverParallelBlock.appendChild(lbl);
+          aktiverParallelBlock.appendChild(renderSchritt(schritt));
+          aktivesParallelDatum = schritt.geplantes_datum;
+        } else {
+          container.appendChild(renderSchritt(schritt));
+        }
       }
     }
+    if (aktiverParallelBlock) container.appendChild(aktiverParallelBlock);
   }
-  if (aktiverParallelBlock) container.appendChild(aktiverParallelBlock);
   return container;
 }
 
@@ -1184,13 +1204,6 @@ function renderGantt(liste, eingeloggt) {
     return d.toISOString().slice(0,10) <= heute && heute <= endD.toISOString().slice(0,10);
   };
 
-  // Phasen-Reihenfolge
-  const phasenReihenfolge = [];
-  const gesehene = new Set();
-  for (const s of liste) {
-    if (!gesehene.has(s.phase)) { phasenReihenfolge.push(s.phase); gesehene.add(s.phase); }
-  }
-
   // Datumsachse: Beschriftungsintervall dynamisch
   const labelIntervall = spanSpalten > 90 ? 14 : spanSpalten > 45 ? 7 : spanSpalten > 20 ? 3 : 1;
 
@@ -1232,82 +1245,79 @@ function renderGantt(liste, eingeloggt) {
 
   // tbody – Phasen und Schritte
   const tbody = document.createElement('tbody');
-  let letztePhase = null;
 
-  for (const schritt of liste) {
-    // Phasen-Kopfzeile
-    if (schritt.phase !== letztePhase) {
-      letztePhase = schritt.phase;
-      const nr = phasenReihenfolge.indexOf(schritt.phase) + 1;
+  gruppiereNachPhase(liste).forEach((gruppe, gruppenIdx) => {
+    const nr = gruppenIdx + 1;
+    const trPhase = document.createElement('tr');
+    trPhase.className = 'gantt-phase-tr';
+    const tdPhaseLabel = document.createElement('td');
+    tdPhaseLabel.className = 'gantt-label gantt-phase-label';
+    tdPhaseLabel.style.color = gruppe.phase_farbe;
+    tdPhaseLabel.textContent = nr + '. ' + gruppe.phase.replace(/^\d+\.\s*/, '');
+    trPhase.appendChild(tdPhaseLabel);
+    for (let i = 0; i < spanSpalten; i++) {
+      const td = document.createElement('td');
+      td.className = 'gantt-zelle' + (istHeuteSpalte(i) ? ' gantt-heute-spalte' : '');
+      trPhase.appendChild(td);
+    }
+    tbody.appendChild(trPhase);
+
+    for (const schritt of gruppe.schritte) {
+      if (!schritt.geplantes_datum) continue;
+
+      const startSpalte = schritt.start_datum
+        ? tagZuSpalte(schritt.start_datum)
+        : tagZuSpalte(schritt.geplantes_datum);
+      const endeSpalte  = tagZuSpalte(schritt.geplantes_datum);
+      const hatBalken   = startSpalte < endeSpalte;
+      const statusKlasse = schritt.erledigt ? 'gantt-erledigt'
+        : schritt.geplantes_datum < heute ? 'gantt-ueberfaellig' : '';
+      const meta = eingeloggt && schritt.verantwortlich_anzeigename
+        ? ' · ' + schritt.verantwortlich_anzeigename : '';
+
       const tr = document.createElement('tr');
-      tr.className = 'gantt-phase-tr';
+      tr.className = 'gantt-schritt-tr';
+
       const tdLabel = document.createElement('td');
-      tdLabel.className = 'gantt-label gantt-phase-label';
-      tdLabel.style.color = schritt.phase_farbe;
-      tdLabel.textContent = nr + '. ' + schritt.phase.replace(/^\d+\.\s*/, '');
+      tdLabel.className = 'gantt-label gantt-schritt-label' + (schritt.erledigt ? ' erledigt' : '');
+      tdLabel.textContent = (schritt.erledigt ? '✓ ' : '') + schritt.titel + meta;
       tr.appendChild(tdLabel);
+
       for (let i = 0; i < spanSpalten; i++) {
         const td = document.createElement('td');
         td.className = 'gantt-zelle' + (istHeuteSpalte(i) ? ' gantt-heute-spalte' : '');
+
+        if (hatBalken) {
+          if (i === startSpalte) {
+            const div = document.createElement('div');
+            div.className = `gantt-balken gantt-balken-start ${statusKlasse}`;
+            div.style.background = schritt.phase_farbe;
+            div.title = schritt.titel + meta;
+            td.appendChild(div);
+          } else if (i > startSpalte && i < endeSpalte) {
+            const div = document.createElement('div');
+            div.className = `gantt-balken gantt-balken-mitte ${statusKlasse}`;
+            div.style.background = schritt.phase_farbe;
+            td.appendChild(div);
+          } else if (i === endeSpalte) {
+            const div = document.createElement('div');
+            div.className = `gantt-balken gantt-balken-ende ${statusKlasse}`;
+            div.style.background = schritt.phase_farbe;
+            td.appendChild(div);
+          }
+        } else if (i === endeSpalte) {
+          const div = document.createElement('div');
+          div.className = `gantt-balken gantt-punkt ${statusKlasse}`;
+          div.style.background = schritt.phase_farbe;
+          div.title = schritt.titel + meta;
+          td.appendChild(div);
+        }
+
         tr.appendChild(td);
       }
       tbody.appendChild(tr);
     }
-
-    if (!schritt.geplantes_datum) continue;
-
-    const startSpalte = schritt.start_datum
-      ? tagZuSpalte(schritt.start_datum)
-      : tagZuSpalte(schritt.geplantes_datum);
-    const endeSpalte  = tagZuSpalte(schritt.geplantes_datum);
-    const hatBalken   = startSpalte < endeSpalte;
-    const statusKlasse = schritt.erledigt ? 'gantt-erledigt'
-      : schritt.geplantes_datum < heute ? 'gantt-ueberfaellig' : '';
-    const meta = eingeloggt && schritt.verantwortlich_anzeigename
-      ? ' · ' + schritt.verantwortlich_anzeigename : '';
-
-    const tr = document.createElement('tr');
-    tr.className = 'gantt-schritt-tr';
-
-    const tdLabel = document.createElement('td');
-    tdLabel.className = 'gantt-label gantt-schritt-label' + (schritt.erledigt ? ' erledigt' : '');
-    tdLabel.textContent = (schritt.erledigt ? '✓ ' : '') + schritt.titel + meta;
-    tr.appendChild(tdLabel);
-
-    for (let i = 0; i < spanSpalten; i++) {
-      const td = document.createElement('td');
-      td.className = 'gantt-zelle' + (istHeuteSpalte(i) ? ' gantt-heute-spalte' : '');
-
-      if (hatBalken) {
-        if (i === startSpalte) {
-          const div = document.createElement('div');
-          div.className = `gantt-balken gantt-balken-start ${statusKlasse}`;
-          div.style.background = schritt.phase_farbe;
-          div.title = schritt.titel + meta;
-          td.appendChild(div);
-        } else if (i > startSpalte && i < endeSpalte) {
-          const div = document.createElement('div');
-          div.className = `gantt-balken gantt-balken-mitte ${statusKlasse}`;
-          div.style.background = schritt.phase_farbe;
-          td.appendChild(div);
-        } else if (i === endeSpalte) {
-          const div = document.createElement('div');
-          div.className = `gantt-balken gantt-balken-ende ${statusKlasse}`;
-          div.style.background = schritt.phase_farbe;
-          td.appendChild(div);
-        }
-      } else if (i === endeSpalte) {
-        const div = document.createElement('div');
-        div.className = `gantt-balken gantt-punkt ${statusKlasse}`;
-        div.style.background = schritt.phase_farbe;
-        div.title = schritt.titel + meta;
-        td.appendChild(div);
-      }
-
-      tr.appendChild(td);
-    }
-    tbody.appendChild(tr);
-  }
+  });
 
   tabelle.appendChild(tbody);
 
@@ -1368,11 +1378,10 @@ function exportiereGanttAlsSvg() {
   const zoom = STATE.ganttZoom, spanTage = Math.max(7, Math.ceil((maxDatum - minDatum) / 86400000) + 2);
   const spanSpalten = Math.ceil(spanTage / zoom);
   const LABELBREITE = 240, SPALTENBREITE = 30, ZEILENHOEHE = 26, KOPFHOEHE = 32;
-  const phasen = []; const gesehene = new Set();
-  for (const s of liste) { if (!gesehene.has(s.phase)) { phasen.push(s.phase); gesehene.add(s.phase); } }
+  const gruppen = gruppiereNachPhase(liste);
   const rasterBreite = spanSpalten * SPALTENBREITE;
   const breite = LABELBREITE + rasterBreite + 32;
-  const hoehe = KOPFHOEHE + (phasen.length + liste.length) * ZEILENHOEHE + 20;
+  const hoehe = KOPFHOEHE + (gruppen.length + liste.length) * ZEILENHOEHE + 20;
   const tagZuSpalte = (iso) => Math.floor(Math.round((new Date(iso) - minDatum) / 86400000) / zoom);
   const heute = heuteISO();
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${breite}" height="${hoehe}" font-family="Arial, Helvetica, sans-serif" font-size="11">`;
@@ -1390,30 +1399,31 @@ function exportiereGanttAlsSvg() {
     }
   }
   svg += `<line x1="0" y1="${KOPFHOEHE}" x2="${breite}" y2="${KOPFHOEHE}" stroke="#ccc" stroke-width="1"/>`;
-  let zeilenY = KOPFHOEHE, letztePhase = null, phaseNr = 0;
-  for (const schritt of liste) {
-    if (schritt.phase !== letztePhase) {
-      letztePhase = schritt.phase; phaseNr++;
-      svg += `<rect x="0" y="${zeilenY}" width="${breite}" height="${ZEILENHOEHE}" fill="${schritt.phase_farbe}28"/>`;
-      svg += `<text x="8" y="${zeilenY+ZEILENHOEHE-7}" fill="${schritt.phase_farbe}" font-weight="bold" font-size="11">${xmlEsc(phaseNr + '. ' + schritt.phase.replace(/^\d+\.\s*/, ''))}</text>`;
+  let zeilenY = KOPFHOEHE;
+  gruppen.forEach((gruppe, phaseIdx) => {
+    const phaseNr = phaseIdx + 1;
+    svg += `<rect x="0" y="${zeilenY}" width="${breite}" height="${ZEILENHOEHE}" fill="${gruppe.phase_farbe}28"/>`;
+    svg += `<text x="8" y="${zeilenY+ZEILENHOEHE-7}" fill="${gruppe.phase_farbe}" font-weight="bold" font-size="11">${xmlEsc(phaseNr + '. ' + gruppe.phase.replace(/^\d+\.\s*/, ''))}</text>`;
+    zeilenY += ZEILENHOEHE;
+
+    for (const schritt of gruppe.schritte) {
+      svg += `<rect x="0" y="${zeilenY}" width="${breite}" height="${ZEILENHOEHE}" fill="${zeilenY%(ZEILENHOEHE*2)===0?'#fff':'#F9F8F5'}"/>`;
+      const tt = schritt.titel.length > 32 ? schritt.titel.slice(0,31)+'…' : schritt.titel;
+      svg += `<text x="10" y="${zeilenY+ZEILENHOEHE-7}" fill="${schritt.erledigt?'#aaa':'#333'}" text-decoration="${schritt.erledigt?'line-through':'none'}" font-size="10">${xmlEsc(tt)}</text>`;
+      if (schritt.geplantes_datum) {
+        const s0 = Math.max(0, Math.min(tagZuSpalte(schritt.start_datum ?? schritt.geplantes_datum), spanSpalten-1));
+        const s1 = Math.max(0, Math.min(tagZuSpalte(schritt.geplantes_datum), spanSpalten-1));
+        const x1 = LABELBREITE + s0*SPALTENBREITE+2, x2 = LABELBREITE + s1*SPALTENBREITE+SPALTENBREITE-2;
+        const y = zeilenY+7, h = 12;
+        const farbe = schritt.erledigt ? '#ccc' : (schritt.geplantes_datum < heute ? '#c0392b' : schritt.phase_farbe);
+        svg += `<g clip-path="url(#rc)">`;
+        if (s0 < s1) svg += `<rect x="${x1}" y="${y}" width="${x2-x1}" height="${h}" rx="4" fill="${farbe}" opacity="0.85"/>`;
+        else svg += `<circle cx="${LABELBREITE+s0*SPALTENBREITE+SPALTENBREITE/2}" cy="${y+h/2}" r="6" fill="${farbe}"/>`;
+        svg += `</g>`;
+      }
       zeilenY += ZEILENHOEHE;
     }
-    svg += `<rect x="0" y="${zeilenY}" width="${breite}" height="${ZEILENHOEHE}" fill="${zeilenY%(ZEILENHOEHE*2)===0?'#fff':'#F9F8F5'}"/>`;
-    const tt = schritt.titel.length > 32 ? schritt.titel.slice(0,31)+'…' : schritt.titel;
-    svg += `<text x="10" y="${zeilenY+ZEILENHOEHE-7}" fill="${schritt.erledigt?'#aaa':'#333'}" text-decoration="${schritt.erledigt?'line-through':'none'}" font-size="10">${xmlEsc(tt)}</text>`;
-    if (schritt.geplantes_datum) {
-      const s0 = Math.max(0, Math.min(tagZuSpalte(schritt.start_datum ?? schritt.geplantes_datum), spanSpalten-1));
-      const s1 = Math.max(0, Math.min(tagZuSpalte(schritt.geplantes_datum), spanSpalten-1));
-      const x1 = LABELBREITE + s0*SPALTENBREITE+2, x2 = LABELBREITE + s1*SPALTENBREITE+SPALTENBREITE-2;
-      const y = zeilenY+7, h = 12;
-      const farbe = schritt.erledigt ? '#ccc' : (schritt.geplantes_datum < heute ? '#c0392b' : schritt.phase_farbe);
-      svg += `<g clip-path="url(#rc)">`;
-      if (s0 < s1) svg += `<rect x="${x1}" y="${y}" width="${x2-x1}" height="${h}" rx="4" fill="${farbe}" opacity="0.85"/>`;
-      else svg += `<circle cx="${LABELBREITE+s0*SPALTENBREITE+SPALTENBREITE/2}" cy="${y+h/2}" r="6" fill="${farbe}"/>`;
-      svg += `</g>`;
-    }
-    zeilenY += ZEILENHOEHE;
-  }
+  });
   svg += '</svg>';
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);

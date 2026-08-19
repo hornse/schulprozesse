@@ -7,6 +7,25 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Behoben
+- **Dublizierte Phasenüberschrift in Checkliste und Zeitstrahl** – wurde ein
+  Schritt zu einer bestehenden eigenen Phase hinzugefügt, bekam er über
+  `handleCreateInstanzSchritt` eine `reihenfolge` über den ganzen Prozess statt
+  je Phase (`backend/api/schritte.php`), und `handleListSchritte` liefert die
+  Schritte ohne `ORDER BY`. Dadurch landete der neue Schritt in der flachen
+  Liste nicht mehr neben seinen Phasengeschwistern. Checkliste, Gantt und
+  SVG-Export gruppierten bisher nur über Zeilennachbarschaft
+  („Phase weicht von der Vorzeile ab" → neue Überschrift) – dieselbe
+  Fehlerklasse, die schon am 22.07.2026 für die Verwaltungsansicht behoben
+  wurde (dort per Sortierung vor dem Gruppieren). Diesmal wird stattdessen
+  echt nach Phasenwert gruppiert (`gruppiereNachPhase()`, gemeinsam für
+  Checkliste, Gantt-Tabelle und SVG-Export), sodass die Reihenfolge in der
+  Ausgangsliste die Anzeige nicht mehr beeinflussen kann.
+- Regressionstest `tests/gruppierung.test.js` (in `tests-schulprozesse.sh`
+  eingebunden) stellt einen Schritt nach, der über fremde Phasen hinweg ans
+  Ende der Liste geschoben wird, und prüft, dass daraus keine zweite
+  Phasenüberschrift entsteht.
+
 Geplant:
 - E-Mail-Erinnerungen bei überfälligen Schritten
 - Alles-zurücksetzen für den kompletten Prozess (aktuell nur pro Phase)

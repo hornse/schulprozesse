@@ -7,6 +7,38 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Hinzugefügt
+- **`docs/ENTSCHEIDUNGEN.md`** – Entscheidungsprotokoll nach dem Muster der
+  Reihe (`../lernzeiten/docs/ENTSCHEIDUNGEN.md`), chronologisch,
+  nummeriert, alte Einträge werden durch neue aufgehoben statt geändert.
+  Vier Einträge nachgetragen: warum das ci-css-Modul unter
+  `backend/public/vendor/` statt `frontend/vendor/` liegt (E1, Gegenstück
+  zu lernzeiten E44), die projekteigenen Kategorienfarben als zulässige
+  Ausnahme samt der bisher nur als CSS-Kommentar stehenden
+  Kontrastentscheidungen zu `--accent`/`--error` (E2, Gegenstück zu
+  lernzeiten E45), warum es zwei `dev-router.php` gibt (E3), und die
+  sechs Einträge der Ausnahmeliste `OHNE_REGEL_BEKANNT` im Testskript
+  (E4) – dort, wo keine Begründung auffindbar war, als „Grund unbekannt"
+  vermerkt statt erfunden.
+- **CLAUDE.md an den Stand der Reihe angeglichen** – Import von
+  `@docs/ENTSCHEIDUNGEN.md`, ein Abschnitt „Design – ci-css" (Vendoring-
+  Disziplin, Kein-Farbwert-außerhalb-der-Tokens mit der
+  Kategorienpaletten-Ausnahme, keine erfundenen Modulklassennamen), ein
+  Abschnitt „Regeln der Reihe" (`LC_ALL=C`, `grep`/`set -e`, Gegenprobe für
+  neue Prüfungen, Prüfungszahl-Disziplin, `deploy.sh` ohne Leerfall-Falle –
+  mit den tatsächlichen Anlässen aus diesem Projekt, nicht aus
+  `lernzeiten` übernommen), ein Abschnitt „Vor jeder Auslieferung wirklich
+  prüfen", Lizenz- und Sprachangabe. Der Dateibaum berichtigt: `tests/`,
+  das `dev-router.php` an der Projektwurzel und `backend/public/vendor/`
+  fehlten.
+- **`deploy.sh` auf den Leerfall geprüft** – verträgt ihn bereits seit dem
+  17.08.2026 (`git add -A`, dann `git commit` nur wenn `git diff --cached`
+  etwas zeigt, `git push` unbedingt danach). Beide Fälle in einem
+  isolierten Sandbox-Repo mit zwei lokalen Remotes durchgespielt: mit
+  Änderung committet und pusht, ohne Änderung überspringt nur den Commit
+  und pusht trotzdem – in beiden Fällen Exitcode 0. Kein Code geändert,
+  keine Produktiv-Remotes berührt.
+
 ### Behoben
 - **Dublizierte Phasenüberschrift in Checkliste und Zeitstrahl** – wurde ein
   Schritt zu einer bestehenden eigenen Phase hinzugefügt, bekam er über

@@ -4,6 +4,9 @@ Diese Datei gibt Claude (und anderen KI-Assistenten) sofortigen Kontext
 über das Projekt, die Infrastruktur und alle bekannten Fallstricke.
 **Bitte zu Beginn jeder Session lesen.**
 
+Ergänzend:
+- Entscheidungen mit Begründung, chronologisch: @docs/ENTSCHEIDUNGEN.md
+
 ---
 
 ## Projektkontext
@@ -21,6 +24,8 @@ Diese Datei gibt Claude (und anderen KI-Assistenten) sofortigen Kontext
 | **Datenbank** | SQLite (`data/app.sqlite`) |
 | **GitHub** | `hornse/schulprozesse` |
 | **Deploy** | `./deploy.sh "commit message"` |
+| **Lizenz** | GPL-3.0-or-later |
+| **Sprache** | Deutsch – Bezeichner, Kommentare, Oberfläche, Commits |
 
 ---
 
@@ -41,12 +46,13 @@ Diese Datei gibt Claude (und anderen KI-Assistenten) sofortigen Kontext
 ```
 schulprozesse/
 ├── backend/
-│   ├── public/
-│   │   ├── dev-router.php      ← PHP Router
+│   ├── public/                 ← Docroot
+│   │   ├── dev-router.php      ← Produktions-Router (Uberspace/supervisord, Port 8083)
 │   │   ├── api-router.php      ← API-Dispatcher
 │   │   ├── index.html          ← SPA
 │   │   ├── js/app.js
-│   │   └── css/style.css
+│   │   ├── css/style.css
+│   │   └── vendor/ci-css/      ← Modul hornse/ci-css, vendored (siehe E1)
 │   ├── src/
 │   │   ├── Auth/
 │   │   │   └── WebUntisAuth.php
@@ -69,12 +75,17 @@ schulprozesse/
 │   └── ...
 ├── data/                       ← SQLite-Datei (NICHT in git)
 │   └── app.sqlite
+├── tests/
+│   └── gruppierung.test.js     ← per Node, eingebunden in tests-schulprozesse.sh
 ├── docs/
+│   ├── ENTSCHEIDUNGEN.md
 │   ├── INSTALL.md
 │   └── BENUTZERHANDBUCH.md
 ├── deploy/
 │   └── uberspace.md
+├── dev-router.php              ← NUR lokal, `php -S ... dev-router.php` an der Projektwurzel (siehe E3)
 ├── deploy.sh
+├── tests-schulprozesse.sh
 ├── CHANGELOG.md
 ├── README.md
 └── LICENSE
@@ -196,6 +207,92 @@ sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
 curl -s https://prozesse.hornse.de/api/auth/me \
   -H "Cookie: swj_session=SESSIONID"
 ```
+
+---
+
+## Design – ci-css
+
+Farben, Radien, Abstände und das Gerüst (`ci-huelle`, `ci-huelle--kopf`)
+kommen aus dem Modul `hornse/ci-css`, vendored unter
+`backend/public/vendor/ci-css/` – abweichend von den übrigen fünf
+Projekten der Reihe, die es unter `frontend/vendor/ci-css/` führen.
+Grund: `backend/public/` ist hier der Docroot, `frontend/` gibt es nicht
+(siehe `docs/ENTSCHEIDUNGEN.md`, E1). Stand: siehe Kopfvermerk in
+`backend/public/vendor/ci-css/ci-tokens.css`.
+
+**Vendored heißt kopiert, nicht abgetippt.** Änderungen am Modul gehören
+ins Modul-Repo `hornse/ci-css` und werden von dort zurückkopiert, nie
+umgekehrt. Jede vendorte Datei trägt einen Kopfvermerk der Form
+`VENDORED aus hornse/ci-css vX.Y.Z – dort ändern, hierher kopieren!`.
+
+**Kein Farbwert außerhalb von `ci-tokens.css`** – mit einer Ausnahme:
+projekteigene Kategorienpaletten, die nur dieses Projekt braucht (Rollen-
+und Sichtbarkeitsmarken für öffentlich/privat/verantwortlich/mitarbeitend),
+stehen im `:root`-Block von `style.css`, mit Kommentar zum Kontrast.
+Begründung: `docs/ENTSCHEIDUNGEN.md`, E2. `tests-schulprozesse.sh` prüft
+entsprechend nur „außerhalb des `:root`-Blocks", nicht „außerhalb von
+`ci-tokens.css`".
+
+**Keine erfundenen Modulklassennamen.** Ein geratener `ci-`Klassenname
+sieht richtig aus und hat einfach keine Regel – in `fachkonferenzen`
+verschwanden dadurch einmal alle Karten. `tests-schulprozesse.sh` prüft
+deshalb im Abschnitt „Gerüst" für jede von `app.js` gesetzte Klasse, ob
+eine CSS-Regel existiert, mit einer benannten Ausnahmeliste für bekannte
+Altlasten (`docs/ENTSCHEIDUNGEN.md`, E4).
+
+---
+
+## Regeln der Reihe
+
+Gelten projektübergreifend für alle Anwendungen der Reihe (sprechtag,
+fachkonferenzen, projektstunden, schulprozesse, signage, lernzeiten):
+
+- **`export LC_ALL=C`** in jedem Shell-Skript mit Zahlenvergleichen.
+  `tests-schulprozesse.sh` setzt es bereits (Zeile 10) – ohne das kann ein
+  Zahlenvergleich je nach Locale unterschiedlich ausfallen.
+- **`grep` mit Exit-Code 1 unter `set -e`** bricht ein Skript ab, auch wenn
+  kein Treffer der Erfolgsfall ist. `tests-schulprozesse.sh` läuft bisher
+  ohne `-e` (nur `set -uo pipefail`), `deploy.sh` mit `set -e`, aber ohne
+  `grep`. Kommt künftig `grep` in ein `set -e`-Skript, braucht ein
+  erwarteter Nulltreffer ein `|| true` – aber nur für den echten
+  Erfolgsfall, nie pauschal für einen Werkzeugfehler.
+- **Jede neue Prüfung braucht eine Gegenprobe.** Den Fehlerfall künstlich
+  herstellen, die Prüfung muss anschlagen – sonst weiß niemand, ob sie
+  überhaupt etwas prüft. So entstand die Prüfung „Gruppierung" in
+  `tests-schulprozesse.sh` (20.08.2026): erst gegen die ungruppierte,
+  fehlerhafte Fassung von `gruppiereNachPhase()` laufen gelassen (rot),
+  erst danach gegen die reparierte (grün).
+- **Wird eine Prüfung erweitert, muss die Prüfungszahl um den erwarteten
+  Betrag steigen.** Bleibt sie gleich oder steigt um weniger, ist die
+  Erweiterung nicht wirksam geworden.
+- **`deploy.sh` muss den Push auch dann erreichen, wenn es nichts zu
+  committen gibt.** Muster: `git add -A`, dann
+  `if ! git diff --cached --quiet; then git commit …`. `deploy.sh` hat das
+  seit dem 17.08.2026 (Commit `753709a`) – Anlass war ein
+  Cache-Busting-Ausdruck, der nur Ziffern erfasste und das `?v=DEV` im
+  Auslieferungszustand nicht traf: das `sed` lief ins Leere, es gab nichts
+  zu committen, und unter `set -e` brach der Commit-Schritt vor dem Push
+  ab.
+
+---
+
+## Vor jeder Auslieferung wirklich prüfen
+
+Nicht behaupten, sondern ausführen:
+
+```bash
+./tests-schulprozesse.sh
+```
+
+Deckt ab: `app.js`-Syntax, die Phasen-Gruppierung
+(`tests/gruppierung.test.js`), Datenschutz (keine externen
+Schriften/Ressourcen), keine Rohfarben außerhalb des `:root`-Blocks,
+vollständige ci-Tokens, Einbindung von Modul und Kopfleiste, keine
+doppelten Shell-Regeln, alle von `app.js` gesetzten Klassen haben eine
+Regel, Barrierefreiheits-Nachrüstungen, `.gitignore`.
+
+Kein separater Integrationstest gegen eine laufende Instanz und kein Lint
+für PHP sind bisher eingerichtet.
 
 ---
 

@@ -98,11 +98,16 @@ sqlite3 data/app.sqlite < migrations/001_init.sql
 sqlite3 data/app.sqlite < migrations/002_seed_schritte.sql
 sqlite3 data/app.sqlite < migrations/003_einstellungen.sql
 sqlite3 data/app.sqlite < migrations/004_instanz_anpassungen.sql
+sqlite3 data/app.sqlite < migrations/005_schritt_herkunft.sql
+sqlite3 data/app.sqlite < migrations/006_schritt_verschieben.sql
 ```
 
-**Wichtig:** Alle vier Migrationen müssen in dieser Reihenfolge eingespielt werden.
+**Wichtig:** Alle Migrationen müssen in dieser Reihenfolge eingespielt werden.
 Migration 003 legt die `einstellungen`-Tabelle an – ohne sie schlägt der
-Erscheinungsbild-Bereich komplett fehl.
+Erscheinungsbild-Bereich komplett fehl. Migration 006 legt die Spalten an, die
+das Verschieben von Schritten per Drag-and-drop braucht (siehe CHANGELOG) –
+ohne sie schlägt das Verschieben eines Vorlage-Schritts in eine andere Phase
+fehl.
 
 ### Schritt 11 – PHP Backend-Server einrichten (Uberspace)
 

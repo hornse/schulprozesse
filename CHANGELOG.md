@@ -8,6 +8,35 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 ## [Unreleased]
 
 ### Hinzugefügt
+- **Schritte per Drag-and-drop verschieben** ("Prozesse verwalten") – sowohl
+  innerhalb einer Phase umsortieren als auch phasenübergreifend verschieben,
+  wirkt sich korrekt in allen vier Ansichten aus (Prozesse verwalten,
+  Checkliste, Zeitstrahl, Gantt). Reihenfolge zählt je Phase (Begründung:
+  `docs/ENTSCHEIDUNGEN.md`, E5). Ein per Vorlage entstandener Schritt
+  wechselt die Phase über zwei neue, prozesseigene Spalten
+  (`schritt_instanzen.instanz_phase_name`/`-farbe`, Migration 006) statt über
+  die globale Vorlage – ein eigener Schritt (ohne Vorlage) trug diese
+  Freiheit schon immer in `phase_name`/`phase_farbe`. Warum eine
+  Fremdschlüssel-Spalte auf `phasen(id)` dafür nicht ausgereicht hätte:
+  `docs/ENTSCHEIDUNGEN.md`, E6. Bedienung: native Drag-and-drop-Ereignisse für
+  die Maus (gleiches Muster wie im bestehenden Vorlagen-Editor), zusätzlich
+  zwei Pfeilschalter je Schritt fürs Umsortieren innerhalb der Phase und eine
+  Auswahl für den Phasenwechsel – beide auch ohne Maus und auf Tablets per
+  Fingertipp bedienbar (E8, E9). Neuer API-Endpunkt
+  `POST /api/prozesse/{id}/schritte/reihenfolge`
+  (`handleSchritteReihenfolge`, `backend/api/schritte.php`): voller Ersatz der
+  Reihenfolge einer Phase je Aufruf, wie bei den beiden bestehenden
+  Bulk-Umsortier-Endpunkten (`/api/vorlagen/reihenfolge`,
+  `/api/phasen/reihenfolge`) – bewusst ohne Versions-/Zeitstempel-Abgleich
+  für gleichzeitige Bearbeitung, Begründung E7. Scheitert das Speichern,
+  springt die Ansicht auf den zuletzt bestätigten Stand zurück statt einen
+  ungespeicherten Zwischenstand stehen zu lassen. Neue Testdatei
+  `tests/schritt-verschieben.test.js` (in `tests-schulprozesse.sh`
+  eingebunden): reine Umsortierfunktion `verschiebeSchritt()`, offline
+  geprüft (innerhalb der Phase hoch/runter/Anfang/Ende, in eine andere
+  Phase, in eine leere Phase, einziger Schritt seiner Phase, Regressionstest
+  gegen die alte Dubletten-Phasenüberschrift, zwei Gegenproben für
+  `pruefeSchrittlisteUnveraendert()`).
 - **`docs/ENTSCHEIDUNGEN.md`** – Entscheidungsprotokoll nach dem Muster der
   Reihe (`../lernzeiten/docs/ENTSCHEIDUNGEN.md`), chronologisch,
   nummeriert, alte Einträge werden durch neue aufgehoben statt geändert.
@@ -40,6 +69,15 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
   keine Produktiv-Remotes berührt.
 
 ### Behoben
+- **`handleListSchritte` sortierte gar nicht** – gefunden bei der Analyse für
+  „Schritte verschieben" (Auftrag, Schritt 2), nicht Teil des ursprünglichen
+  Auftrags, aber notwendig damit eine neue Reihenfolge überhaupt sichtbar
+  wird: weder die Vorlage- noch die Eigene-Schritte-Abfrage hatten ein
+  `ORDER BY`, und `array_merge()` reihte grundsätzlich zuerst alle
+  Vorlage-Schritte, dann alle eigenen. `instanz_reihenfolge` ließ sich zwar
+  schon vorher per `PATCH` setzen, wirkte sich aber in keiner der vier
+  Ansichten sichtbar aus. Jetzt sortiert `handleListSchritte` selbst nach
+  Phase und Reihenfolge, bevor es antwortet.
 - **Dublizierte Phasenüberschrift in Checkliste und Zeitstrahl** – wurde ein
   Schritt zu einer bestehenden eigenen Phase hinzugefügt, bekam er über
   `handleCreateInstanzSchritt` eine `reihenfolge` über den ganzen Prozess statt

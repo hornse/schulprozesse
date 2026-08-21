@@ -50,6 +50,17 @@ if command -v node > /dev/null 2>&1; then
 else
     echo "  –  node nicht vorhanden"
 fi
+if command -v node > /dev/null 2>&1; then
+    if node tests/schritt-verschieben.test.js > /tmp/schritt-verschieben-test.$$.log 2>&1; then
+        gruen "Schritte verschieben: Reihenfolge-Logik ist korrekt"
+    else
+        rot "Schritte verschieben: Reihenfolge-Logik fehlerhaft (siehe tests/schritt-verschieben.test.js)"
+        sed 's/^/      /' /tmp/schritt-verschieben-test.$$.log
+    fi
+    rm -f /tmp/schritt-verschieben-test.$$.log
+else
+    echo "  –  node nicht vorhanden"
+fi
 
 echo ""
 echo "Datenschutz"

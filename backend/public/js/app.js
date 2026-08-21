@@ -300,6 +300,16 @@ async function reihenfolgeAendern(phase_id, vorlage_ids) {
   render();
 }
 
+// Speichert die neue Reihenfolge (und ggf. den Phasenwechsel) EINER Phase
+// eines Prozesses – Gegenstück zu handleSchritteReihenfolge() im Backend.
+// eintraege: [{id, typ: 'vorlage'|'eigen'}, ...] in der gewünschten Reihenfolge.
+async function schritteReihenfolgeSpeichern(prozessId, zielPhase, zielPhaseFarbe, eintraege) {
+  await api(`/api/prozesse/${prozessId}/schritte/reihenfolge`, {
+    method: 'POST',
+    body: { ziel_phase: zielPhase, ziel_phase_farbe: zielPhaseFarbe, eintraege },
+  });
+}
+
 async function neuePhase(name, farbe) {
   await api('/api/phasen', { method: 'POST', body: { name, farbe } });
   await ladeAlles();
@@ -471,6 +481,84 @@ function gruppiereNachPhase(liste) {
     gruppe.schritte.push(schritt);
   }
   return gruppen;
+}
+
+// ============================================================================
+// Schritte verschieben (Drag-and-drop, Pfeiltasten) – reine Funktionen
+// Kein Datenbankzugriff, kein DOM: offline prüfbar, siehe
+// tests/schritt-verschieben.test.js.
+// ============================================================================
+
+// Liefert Name+Farbe jeder Phase, die in der Liste aktuell vorkommt, in der
+// Reihenfolge ihres ersten Auftretens – Grundlage für die Zielphasen-Auswahl
+// beim Verschieben (nur bestehende Phasen sind Ziel, siehe ENTSCHEIDUNGEN.md).
+function ermittlePhasenZiele(liste) {
+  return gruppiereNachPhase(liste).map((g) => ({ name: g.phase, farbe: g.phase_farbe }));
+}
+
+/**
+ * Verschiebt einen Schritt innerhalb der flachen Liste – reine Funktion.
+ *
+ * @param {Array} liste     Flache Schrittliste (id, phase, reihenfolge, ...)
+ * @param {number} schrittId  id des zu verschiebenden Schritts
+ * @param {string} zielPhase  Name der Zielphase (kann gleich der aktuellen sein)
+ * @param {number} zielIndex  0-basierte Position UNTER DEN VERBLEIBENDEN
+ *                             SCHRITTEN DER ZIELPHASE (der verschobene Schritt
+ *                             gilt dabei schon als herausgenommen). Werte
+ *                             außerhalb des gültigen Bereichs werden geklemmt.
+ * @returns {Array} neue Liste (keine der Eingabe-Objekte wird verändert);
+ *                   reihenfolge in Quell- UND Zielphase lückenlos ab 1 neu
+ *                   vergeben, phase des verschobenen Schritts aktualisiert.
+ */
+function verschiebeSchritt(liste, schrittId, zielPhase, zielIndex) {
+  const quellSchritt = liste.find((s) => s.id === schrittId);
+  if (!quellSchritt) throw new Error(`Schritt ${schrittId} nicht in der Liste.`);
+  const quellPhase = quellSchritt.phase;
+
+  const ohneSchritt = liste.filter((s) => s.id !== schrittId);
+
+  const zielListe = ohneSchritt
+    .filter((s) => s.phase === zielPhase)
+    .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0));
+
+  const clampedIndex = Math.max(0, Math.min(zielIndex, zielListe.length));
+  zielListe.splice(clampedIndex, 0, quellSchritt);
+  const zielReihenfolge = new Map(zielListe.map((s, i) => [s.id, i + 1]));
+
+  let quellReihenfolge = new Map();
+  if (quellPhase !== zielPhase) {
+    const quellListe = ohneSchritt
+      .filter((s) => s.phase === quellPhase)
+      .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0));
+    quellReihenfolge = new Map(quellListe.map((s, i) => [s.id, i + 1]));
+  }
+
+  // Farbe der Zielphase: von einem bereits dort vorhandenen Schritt übernehmen
+  // (nicht vom gerade eingefügten quellSchritt, dessen Farbe noch die alte
+  // Phase trägt); ist die Zielphase leer, bleibt die bisherige Farbe des
+  // verschobenen Schritts als einzig verfügbarer Anhaltspunkt.
+  const zielVorbild = ohneSchritt.find((s) => s.phase === zielPhase);
+  const zielFarbe = zielVorbild ? zielVorbild.phase_farbe : quellSchritt.phase_farbe;
+
+  return liste.map((s) => {
+    if (s.id === schrittId) {
+      return { ...s, phase: zielPhase, phase_farbe: zielFarbe, reihenfolge: zielReihenfolge.get(s.id) };
+    }
+    if (zielReihenfolge.has(s.id)) return { ...s, reihenfolge: zielReihenfolge.get(s.id) };
+    if (quellReihenfolge.has(s.id)) return { ...s, reihenfolge: quellReihenfolge.get(s.id) };
+    return s;
+  });
+}
+
+// Robustheit vor dem Speichern (siehe AUFTRAG-schritte-verschieben.md,
+// Schritt 3): kein Schritt darf verlorengehen oder sich verdoppeln.
+function pruefeSchrittlisteUnveraendert(alt, neu) {
+  if (alt.length !== neu.length) return false;
+  const altIds = new Set(alt.map((s) => s.id));
+  const neuIds = new Set(neu.map((s) => s.id));
+  if (altIds.size !== neuIds.size) return false;
+  for (const id of altIds) if (!neuIds.has(id)) return false;
+  return true;
 }
 
 // ============================================================================
@@ -1533,9 +1621,157 @@ function renderProzessVerwaltungInhalt() {
 // Puffer für neue instanzspezifische Phasen (phase_name → { farbe })
 let instanzPhasenPuffer = {};
 
+// Zeigt kurz einen Fehler an einer Stelle an, die beim Verschieben nicht
+// wegspringt (kein alert(), das würde den Browser-Fokus/Scroll durcheinander
+// bringen, während gerade eine Zeile umsortiert wurde).
+function zeigeVerschiebeFehler(nachricht) {
+  const bestehend = document.querySelector('.verschiebe-fehler');
+  if (bestehend) bestehend.remove();
+  const el = document.createElement('div');
+  el.className = 'verschiebe-fehler';
+  el.textContent = nachricht;
+  document.querySelector('.instanz-schritte-liste')?.before(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
+/**
+ * Verschiebt einen Schritt (innerhalb einer Phase oder in eine andere) und
+ * speichert das Ergebnis. Aktualisiert STATE.schritte sofort optimistisch
+ * (sichtbares Feedback ohne auf das Netzwerk zu warten), speichert im
+ * Hintergrund und lädt bei Erfolg den kanonischen Stand vom Server nach.
+ * Scheitert das Speichern, springt STATE.schritte zurück auf den zuletzt
+ * bestätigten Stand (siehe AUFTRAG-schritte-verschieben.md, Schritt 3).
+ */
+async function schrittVerschieben(schrittId, zielPhase, zielIndex) {
+  const bestaetigterStand = STATE.schritte;
+  const quellSchritt = bestaetigterStand.find((s) => s.id === schrittId);
+  if (!quellSchritt) return;
+  const quellPhase = quellSchritt.phase;
+
+  let neueListe;
+  try {
+    neueListe = verschiebeSchritt(bestaetigterStand, schrittId, zielPhase, zielIndex);
+  } catch (err) {
+    zeigeVerschiebeFehler('Interner Fehler beim Verschieben: ' + err.message);
+    return;
+  }
+  if (!pruefeSchrittlisteUnveraendert(bestaetigterStand, neueListe)) {
+    zeigeVerschiebeFehler('Verschieben abgebrochen: Schrittliste wäre inkonsistent geworden.');
+    return;
+  }
+
+  STATE.schritte = neueListe;
+  render();
+
+  const zuTyp = (s) => (s.quelle === 'eigen' ? 'eigen' : 'vorlage');
+  const eintraegeFuer = (phase) => neueListe
+    .filter((s) => s.phase === phase)
+    .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0))
+    .map((s) => ({ id: s.id, typ: zuTyp(s) }));
+
+  const zielFarbe = neueListe.find((s) => s.phase === zielPhase)?.phase_farbe ?? quellSchritt.phase_farbe;
+
+  try {
+    await schritteReihenfolgeSpeichern(STATE.prozessId, zielPhase, zielFarbe, eintraegeFuer(zielPhase));
+    if (quellPhase !== zielPhase) {
+      const quellEintraege = eintraegeFuer(quellPhase);
+      if (quellEintraege.length > 0) {
+        const quellFarbe = neueListe.find((s) => s.phase === quellPhase)?.phase_farbe
+          ?? bestaetigterStand.find((s) => s.phase === quellPhase)?.phase_farbe;
+        await schritteReihenfolgeSpeichern(STATE.prozessId, quellPhase, quellFarbe, quellEintraege);
+      }
+    }
+    const [res, resAlle] = await Promise.all([
+      api(`/api/schritte?prozess_id=${STATE.prozessId}`),
+      api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
+    ]);
+    STATE.schritte = res.schritte;
+    STATE.schritteAlle = resAlle.schritte;
+    render();
+  } catch (err) {
+    STATE.schritte = bestaetigterStand;
+    render();
+    zeigeVerschiebeFehler('Verschieben fehlgeschlagen, nicht gespeichert: ' + err.message);
+  }
+}
+
 function renderInstanzSchrittVerwaltung() {
   const block = document.createElement('div');
   block.className = 'admin-section';
+
+  // Ziehzustand für Drag-and-drop, geteilt zwischen Vorlage- und eigenen
+  // Schritten (beide Abschnitte dieser Funktion) – bewusst eigene Variable,
+  // nicht dragZustand/dragZustandPhase (die gehören dem Vorlagen-Editor im
+  // Admin-Bereich, renderPhasenBlock/renderVorlagenZeile).
+  let ziehSchrittId = null;
+
+  // Baut die <select>-Zielauswahl für den Phasenwechsel eines Schritts:
+  // nur bestehende, aktuell sichtbare Phasen (siehe ENTSCHEIDUNGEN.md –
+  // Drag-and-drop erzeugt keine neuen Phasen, dafür gibt es "Neue Phase
+  // anlegen"), die eigene Phase des Schritts ausgenommen.
+  function renderPhasenZielAuswahl(schritt) {
+    const sel = document.createElement('select');
+    sel.className = 'schritt-phasen-ziel';
+    sel.title = 'In andere Phase verschieben';
+    const optionLeer = document.createElement('option');
+    optionLeer.value = '';
+    optionLeer.textContent = '→ andere Phase …';
+    sel.appendChild(optionLeer);
+    for (const ziel of ermittlePhasenZiele(STATE.schritte)) {
+      if (ziel.name === schritt.phase) continue;
+      const opt = document.createElement('option');
+      opt.value = ziel.name;
+      opt.textContent = ziel.name.replace(/^\d+\.\s*/, '');
+      sel.appendChild(opt);
+    }
+    sel.addEventListener('change', () => {
+      if (!sel.value) return;
+      const anzahlInZielphase = STATE.schritte.filter((s) => s.phase === sel.value).length;
+      schrittVerschieben(schritt.id, sel.value, anzahlInZielphase); // ans Ende anhängen
+    });
+    return sel;
+  }
+
+  // Pfeilschalter für Tastatur-/Berührungsbedienung: verschieben innerhalb
+  // der eigenen Phase um eine Position (siehe AUFTRAG-schritte-verschieben.md,
+  // Schritt 3 – Drag-and-drop allein wäre für Tastatur/Tablet unerreichbar).
+  function renderPfeilSchalter(schritt) {
+    const wrap = document.createElement('span');
+    wrap.className = 'schritt-pfeile';
+    const eigenePhase = STATE.schritte
+      .filter((s) => s.phase === schritt.phase)
+      .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0));
+    const p = eigenePhase.findIndex((s) => s.id === schritt.id);
+
+    const hoch = document.createElement('button');
+    hoch.type = 'button'; hoch.className = 'btn-sekundaer btn schritt-pfeil';
+    hoch.textContent = '↑'; hoch.title = 'Innerhalb der Phase nach oben';
+    hoch.disabled = p <= 0;
+    hoch.addEventListener('click', () => schrittVerschieben(schritt.id, schritt.phase, p - 1));
+
+    const runter = document.createElement('button');
+    runter.type = 'button'; runter.className = 'btn-sekundaer btn schritt-pfeil';
+    runter.textContent = '↓'; runter.title = 'Innerhalb der Phase nach unten';
+    runter.disabled = p === -1 || p >= eigenePhase.length - 1;
+    runter.addEventListener('click', () => schrittVerschieben(schritt.id, schritt.phase, p + 1));
+
+    wrap.appendChild(hoch);
+    wrap.appendChild(runter);
+    return wrap;
+  }
+
+  // Berechnet aus einer Drop-Position (Ziel-id oder null = Ende) den
+  // zielIndex-Parameter für schrittVerschieben() – dieselbe Herleitung wie
+  // beim bestehenden Drag-and-drop im Vorlagen-Editor (renderPhasenBlock),
+  // hier nur auf STATE.schritte statt auf schritt_vorlagen angewendet.
+  function zielIndexAusDrop(schrittId, zielPhase, zielSchrittId) {
+    const rest = STATE.schritte
+      .filter((s) => s.phase === zielPhase && s.id !== schrittId)
+      .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0));
+    if (zielSchrittId == null) return rest.length;
+    const idx = rest.findIndex((s) => s.id === zielSchrittId);
+    return idx === -1 ? rest.length : idx;
+  }
 
   const header = document.createElement('div');
   header.innerHTML = `
@@ -1776,6 +2012,17 @@ function renderInstanzSchrittVerwaltung() {
         const schrittListe = document.createElement('div');
         schrittListe.className = 'vorlagen-liste';
         phaseBlock.appendChild(schrittListe);
+        schrittListe.addEventListener('dragover', (e) => { if (ziehSchrittId != null) e.preventDefault(); });
+        schrittListe.addEventListener('drop', (e) => {
+          if (ziehSchrittId == null) return;
+          e.preventDefault();
+          const zielEl = e.target.closest('[data-schritt-id]');
+          const zielSchrittId = zielEl ? Number(zielEl.dataset.schrittId) : null;
+          const zi = zielIndexAusDrop(ziehSchrittId, s.phase, zielSchrittId);
+          const id = ziehSchrittId;
+          ziehSchrittId = null;
+          schrittVerschieben(id, s.phase, zi);
+        });
 
         // Neuen eigenen Schritt zu dieser Vorlage-Phase hinzufügen
         const addReihe = document.createElement('div');
@@ -1835,12 +2082,14 @@ function renderInstanzSchrittVerwaltung() {
         }
         const zeile = document.createElement('div');
         zeile.className = 'instanz-schritt-zeile' + (s.deaktiviert ? ' deaktiviert' : '');
+        zeile.dataset.schrittId = s.id;
         const origTitel = s.vorlage_titel ?? s.titel ?? '';
         const anzeigetitel = s.instanz_titel ?? origTitel;
         // Nur für diesen Prozess angelegte Schritte dürfen gelöscht werden;
         // echte Vorlage-Schritte können hier nur ausgeblendet werden.
         const nurHier = !!s.nur_dieser_prozess;
         zeile.innerHTML = `
+          ${s.deaktiviert ? '' : '<span class="zieh-griff" draggable="true" title="Ziehen zum Umsortieren">⠿</span>'}
           <input type="text" class="instanz-titel-feld"
                  value="${anzeigetitel.replace(/"/g, '&quot;')}"
                  placeholder="${origTitel.replace(/"/g, '&quot;')}"
@@ -1856,6 +2105,17 @@ function renderInstanzSchrittVerwaltung() {
           ${nurHier ? `<button class="btn-sekundaer btn btn-gefahr" data-loeschen
                   style="width:auto;font-size:11px;padding:3px 8px;"
                   title="Diesen Schritt endgültig löschen">🗑</button>` : ''}`;
+
+        if (!s.deaktiviert) {
+          zeile.querySelector('.zieh-griff').addEventListener('dragstart', (e) => {
+            ziehSchrittId = s.id; zeile.classList.add('wird-gezogen'); e.dataTransfer.effectAllowed = 'move';
+          });
+          zeile.querySelector('.zieh-griff').addEventListener('dragend', () => {
+            zeile.classList.remove('wird-gezogen'); ziehSchrittId = null;
+          });
+          zeile.appendChild(renderPfeilSchalter(s));
+          zeile.appendChild(renderPhasenZielAuswahl(s));
+        }
 
         const titelFeld = zeile.querySelector('.instanz-titel-feld');
         const origSpan  = zeile.querySelector('.instanz-orig');
@@ -2061,17 +2321,42 @@ function renderInstanzSchrittVerwaltung() {
       // Schritte der Phase
       const schrittListe = document.createElement('div');
       schrittListe.className = 'vorlagen-liste';
+      schrittListe.addEventListener('dragover', (e) => { if (ziehSchrittId != null) e.preventDefault(); });
+      schrittListe.addEventListener('drop', (e) => {
+        if (ziehSchrittId == null) return;
+        e.preventDefault();
+        const zielEl = e.target.closest('[data-schritt-id]');
+        const zielSchrittId = zielEl ? Number(zielEl.dataset.schrittId) : null;
+        const zi = zielIndexAusDrop(ziehSchrittId, phaseName, zielSchrittId);
+        const id = ziehSchrittId;
+        ziehSchrittId = null;
+        schrittVerschieben(id, phaseName, zi);
+      });
       schritte.forEach((s) => {
         const zeile = document.createElement('div');
         zeile.className = 'vorlagen-zeile-wrapper';
+        zeile.dataset.schrittId = s.id;
         zeile.innerHTML = `
           <div class="vorlagen-zeile">
+            <span class="zieh-griff" draggable="true" title="Ziehen zum Umsortieren">⠿</span>
             <input type="text" class="vorlagen-titel-feld"
                    value="${s.titel.replace(/"/g, '&quot;')}">
             <button class="btn-sekundaer btn btn-gefahr"
                     style="width:auto;font-size:11px;padding:3px 8px;"
                     title="Diesen Schritt endgültig löschen">🗑</button>
           </div>`;
+        zeile.querySelector('.zieh-griff').addEventListener('dragstart', (e) => {
+          ziehSchrittId = s.id; zeile.classList.add('wird-gezogen'); e.dataTransfer.effectAllowed = 'move';
+        });
+        zeile.querySelector('.zieh-griff').addEventListener('dragend', () => {
+          zeile.classList.remove('wird-gezogen'); ziehSchrittId = null;
+        });
+        const stateSchritt = STATE.schritte.find((x) => x.id === s.id && x.quelle === 'eigen');
+        if (stateSchritt) {
+          const zeileDiv = zeile.querySelector('.vorlagen-zeile');
+          zeileDiv.appendChild(renderPfeilSchalter(stateSchritt));
+          zeileDiv.appendChild(renderPhasenZielAuswahl(stateSchritt));
+        }
         zeile.querySelector('.vorlagen-titel-feld').addEventListener('change', async (e) => {
           await api(`/api/instanz-schritte/${s.id}`, {
             method: 'PATCH', body: { titel: e.target.value.trim() }

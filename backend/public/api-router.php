@@ -67,6 +67,9 @@ $routes = [
     ['DELETE', '#^api/schritte/(?P<id>\d+)$#',                           'handleDeleteSchrittInstanz'],
     ['POST',   '#^api/schritte/(?P<id>\d+)/duplizieren$#',               'handleDuplizierenSchritt'],
 
+    // Schritte per Drag-and-drop/Pfeiltasten verschieben (Prozesse verwalten)
+    ['POST',   '#^api/prozesse/(?P<prozess_id>\d+)/schritte/reihenfolge$#', 'handleSchritteReihenfolge'],
+
     // Prozessspezifische Phasen-Anpassungen
     ['POST',   '#^api/prozesse/(?P<prozess_id>\d+)/instanz-phasen/(?P<phase_id>\d+)$#', 'handleUpsertInstanzPhase'],
     ['DELETE', '#^api/prozesse/(?P<prozess_id>\d+)/instanz-phasen/(?P<phase_id>\d+)$#', 'handleDeleteInstanzPhase'],

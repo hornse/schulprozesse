@@ -156,3 +156,163 @@ Commit-Nachrichten dokumentiert. Nicht erfunden.
 
 **Entscheidung:** Liste bleibt wie vorgefunden, hier nur dokumentiert statt
 verändert.
+
+---
+
+## E5 — Reihenfolge beim Verschieben: je Phase gezählt (21.08.2026)
+
+**Anlass:** `docs/AUFTRAG-schritte-verschieben.md` verlangte für Schritt 2
+ausdrücklich eine begründete Empfehlung zu einer offenen Frage: zählt
+`reihenfolge` fortlaufend über den ganzen Prozess oder je Phase neu ab 1?
+
+**Begründung:** Es ist bereits die durchgängige Konvention in diesem
+Projekt — `schritt_vorlagen.reihenfolge` und `instanz_schritte.reihenfolge`
+zählen beide je Phase (`MAX(reihenfolge) WHERE phase_id = …` bzw. mit
+gleicher Wirkung je Prozess), und die beiden bestehenden
+Bulk-Umsortier-Endpunkte (`handleReihenfolgeVorlagen`,
+`handleReihenfolgePhasen`, `backend/api/vorlagen.php`/`phasen.php`) tun das
+auch. Eine fortlaufende Zählung hätte bei jedem Phasenwechsel eine
+Neunummerierung *aller* nachfolgenden Schritte über Phasengrenzen hinweg
+gebraucht; „je Phase" muss nur die eine betroffene Phase neu durchzählen —
+genau das Muster, das `handleUpdateVorlage` für Vorlage-Phasenwechsel schon
+vorlebt (ans Ende der neuen Phase anhängen).
+
+**Entscheidung:** `instanz_reihenfolge` (vorlage-basierte Schritte) und
+`reihenfolge` (eigene Schritte) zählen je Phase, beginnend bei 1. Der neue
+Endpunkt `POST /api/prozesse/{id}/schritte/reihenfolge`
+(`handleSchritteReihenfolge`, `backend/api/schritte.php`) bekommt bei jedem
+Aufruf die komplette neue Reihenfolge EINER Phase (voller Ersatz), analog zu
+den beiden bestehenden Endpunkten.
+
+---
+
+## E6 — Phasenwechsel per Freitext-Überschreibung statt Fremdschlüssel (21.08.2026)
+
+**Anlass:** Ein vorlage-basierter Schritt (`schritt_instanzen`) hängt fest an
+einer `phasen`-Zeile (`schritt_vorlagen.phase_id`) – global, geteilt von
+allen Prozessen, die dieselbe Vorlage nutzen. Ein eigener Schritt
+(`instanz_schritte`) kennt „Phase" dagegen nur als freies Namens-/Farbfeld
+ohne eigene Tabelle. Rückfrage im Chat vor dieser Entscheidung: Soll
+Drag-and-drop zwischen beiden Welten wechseln können?
+
+**Antwort des Auftraggebers:** „Prozess verwalten" ist eine Kopie der
+Vorlage, mit der Verantwortliche frei arbeiten können sollen — eine
+Verschiebung dort darf niemals auf die Vorlage zurückwirken, und der Prozess
+kann später archiviert und wiederverwendet werden. Das schließt beide Welten
+gleichberechtigt ein: ein Wechsel muss in beide Richtungen möglich sein.
+
+**Verworfene Alternative:** eine neue Spalte `instanz_phase_id INTEGER
+REFERENCES phasen(id)`, analog zu `instanz_reihenfolge`. Verworfen, weil
+eigene Phasen keine `phasen`-Zeile haben — eine Fremdschlüssel-Spalte hätte
+den Wechsel in eine eigene Phase gar nicht abbilden können, ohne für jede
+eigene Phase nachträglich eine `phasen`-Zeile anzulegen (ein deutlich
+größerer Umbau, der `phasen` von einer projektweiten in eine
+prozessspezifische Tabelle verwandelt hätte).
+
+**Entscheidung:** Migration 006 fügt `schritt_instanzen.instanz_phase_name`
+und `instanz_phase_farbe` hinzu (Freitext, wie bei `instanz_schritte` schon
+immer). `NULL` (Standard) heißt: der Schritt folgt weiter seiner
+Vorlage-Phase, auch über spätere Umbenennungen. Gesetzt heißt: der Schritt
+wurde ausdrücklich verschoben und folgt der Vorlage-Phase ab da nicht mehr —
+er „lebt" jetzt unter dem Namen/der Farbe der Zielphase, unabhängig davon ob
+diese eine echte `phasen`-Zeile hat oder eine rein eigene ist. Ein reines
+Umsortieren *innerhalb* der angestammten Phase setzt diese Felder nicht
+(siehe `handleSchritteReihenfolge`, Vergleich der aktuellen mit der
+Ziel-Phase vor jedem Schreibzugriff) — ein Schritt verliert die Kopplung an
+seine Vorlage-Phase also nur, wenn er tatsächlich verschoben wurde, nicht
+schon durch bloßes Umsortieren.
+
+**Nebenwirkung, bewusst in Kauf genommen:** Ein derart verschobener Schritt
+liefert `phase_id: null` (`handleListSchritte`, CASE-Ausdruck) – er ist nicht
+mehr eindeutig einer `phasen`-Zeile zuordenbar, sobald er den Verbund
+verlassen hat. Bestehender Code, der `phase_id` nutzt (`getPhaseId()` in
+`app.js`, für die „↺ Phase"-Zurücksetzen-Knöpfe und `instanz-phasen`-Aufrufe),
+sucht ohnehin unter allen Schritten derselben angezeigten Phase nach einem
+mit gesetzter `phase_id` — ein verschobener Schritt wird dabei einfach
+übersprungen, ein noch nicht verschobener liefert weiter die richtige ID.
+Sind irgendwann *alle* Schritte einer ehemaligen Vorlage-Phase weggezogen,
+verhält sich der (jetzt leere) Rest wie eine eigene Phase — folgerichtig,
+nicht als Fehler zu werten.
+
+---
+
+## E7 — Gleichzeitige Bearbeitung: kein Konflikt-Schutz, wie beim bestehenden Muster (21.08.2026)
+
+**Anlass:** `docs/AUFTRAG-schritte-verschieben.md`, Schritt 3, verlangt eine
+ausdrückliche Antwort auf die Frage, was passiert, wenn zwei Personen
+denselben Prozess gleichzeitig umsortieren — auch wenn die Antwort
+„vernachlässigbar" lautet.
+
+**Bestandsaufnahme:** Die beiden bereits bestehenden Bulk-Umsortier-Endpunkte
+dieses Projekts (`handleReihenfolgeVorlagen`, `handleReihenfolgePhasen`)
+prüfen keinerlei Version oder Zeitstempel — reines Last-Write-Wins, wer
+zuletzt speichert gewinnt vollständig.
+
+**Entscheidung:** `handleSchritteReihenfolge` macht es genauso — kein
+Versions-/Zeitstempel-Abgleich. Begründung: kleiner, den Beteiligten
+bekannter Nutzerkreis (Kolleginnen und Kollegen, keine Fremden), in aller
+Regel genau eine verantwortliche Person je Prozess-Phase, die gerade
+umsortiert. Ein echter Zeitkonflikt zweier gleichzeitiger Verschiebungen
+derselben Phase gilt als vernachlässigbar selten und wird explizit in Kauf
+genommen — **ausdrücklich**, nicht stillschweigend.
+
+Ein struktureller Schutz bleibt trotzdem bestehen, weil er sich aus der
+Robustheitsanforderung „kein Schritt darf verlorengehen" ergibt, nicht aus
+Konflikt-Erkennung: Jeder Eintrag im Aufruf muss existieren und zu diesem
+Prozess gehören, sonst wird die GESAMTE Anfrage abgelehnt (409), bevor
+irgendetwas geschrieben wird. Das verhindert, dass ein Schritt verschwindet,
+weil er zwischen Laden und Speichern durch eine andere Aktion (z. B.
+Löschen) aus der Liste verschwunden ist — es ist aber kein Schutz gegen zwei
+gleichzeitige, beide für sich genommen gültige Umsortierungen derselben
+Phase.
+
+---
+
+## E8 — Tastaturbedienung: Pfeilschalter + Auswahl statt Drag-in-Nachbarphase (21.08.2026)
+
+**Anlass:** `docs/AUFTRAG-schritte-verschieben.md`, Schritt 3, verlangt
+Tastaturbedienbarkeit und schlägt „zwei Pfeilschalter je Schritt" vor, „das
+Verschieben in eine andere Phase braucht dann eine Auswahl."
+
+**Entscheidung, wie genau:** Die Pfeilschalter (↑/↓) verschieben nur
+innerhalb der eigenen Phase um eine Position (am Rand deaktiviert). Der
+Phasenwechsel läuft über ein `<select>` je Schritt, das alle *aktuell
+sichtbaren* Phasen dieses Prozesses als Ziel anbietet (ermittelt aus der
+bereits geladenen Schrittliste, nicht aus einer zusätzlichen Abfrage) und
+den Schritt beim Auswählen ans Ende der Zielphase anhängt. Drag-and-drop
+erzeugt dabei bewusst **keine neue Phase** — wer eine neue Phase braucht,
+nutzt weiter das bestehende Formular „Neue Phase anlegen". Diese Beschränkung
+gilt gleichermaßen für Maus-Drag-and-drop: es lässt sich nur auf bereits
+gerenderte Phasenblöcke ziehen, also ebenfalls nur auf bestehende Phasen.
+
+**Warum keine „leere Phase" als Ziel vorkommen kann:** Eine `phasen`-Zeile
+ohne zugehörige Schritt-Instanzen in diesem Prozess wird hier gar nicht erst
+als Block gerendert, eine eigene Phase existiert nur, solange sie
+mindestens einen Schritt hat. Der vom Auftrag geforderte Testfall „in eine
+leere Phase" ist deshalb ein Fall der *reinen Funktion* `verschiebeSchritt()`
+(offline, mit synthetischen Daten in `tests/schritt-verschieben.test.js`
+geprüft), nicht ein Bedienfall in der Oberfläche.
+
+---
+
+## E9 — Berührungsbedienung: kein echtes Ziehen, aber vollständig über dieselben Knöpfe bedienbar (21.08.2026)
+
+**Anlass:** `docs/AUFTRAG-schritte-verschieben.md`, Schritt 3: „Wenn das
+[Berührungsbedienung] den Rahmen sprengt, sag es."
+
+**Befund:** Native HTML5-Drag-and-drop-Ereignisse (`dragstart`/`dragover`/
+`drop`), wie sie hier für Maus-Bedienung eingesetzt werden (gleiches Muster
+wie im bestehenden Vorlagen-Editor, `renderPhasenBlock`/`renderVorlagenZeile`
+in `app.js`), lösen auf Tablets nicht zuverlässig aus. Eine eigene,
+Pointer-Events-basierte Zieh-Geste dafür ist nicht umgesetzt — das hätte den
+Rahmen dieses Auftrags gesprengt.
+
+**Warum das kein Bedienbarkeitsverlust ist:** Die Pfeilschalter und die
+Zielphasen-Auswahl aus E8 sind gewöhnliche `<button>`- und `<select>`-
+Elemente – auf einem Tablet per Fingertipp genauso bedienbar wie eine
+Maus-Bedienung. Tablet-Nutzerinnen und -Nutzer verlieren also keine
+Funktion, nur die Zieh-Geste selbst bleibt Maus-only.
+
+**Entscheidung:** So ausgeliefert. Eine echte Touch-Zieh-Geste bleibt
+offen für einen späteren, eigenen Auftrag, falls sich das als tatsächliches
+Bedürfnis herausstellt.

@@ -40,16 +40,19 @@ function handleListSchritte(PDO $db, array $config, array $input): void
 
     $nurAktive = empty($input['alle']); // alle=1 liefert auch deaktivierte (für Verwaltung)
 
-    // Vorlage-basierte Schritte – mit prozessspezifischen Phasen-Überschreibungen
+    // Vorlage-basierte Schritte – mit prozessspezifischen Phasen-Überschreibungen.
+    // COALESCE(si.instanz_phase_name, ...): ein per Drag-and-drop verschobener
+    // Schritt (Migration 006) überschreibt Name UND Farbe der Phase vollständig
+    // und hängt sich damit von ip/p ab – siehe docs/ENTSCHEIDUNGEN.md.
     $stmt = $db->prepare(
         'SELECT si.id, si.erledigt, si.verantwortlich_user, si.verantwortlich_anzeigename,
                 si.start_datum, si.geplantes_datum, si.erledigt_am, si.erledigt_von,
                 si.kommentar, si.kann_parallel, si.deaktiviert,
                 si.instanz_titel, si.instanz_reihenfolge,
-                COALESCE(ip.instanz_name,  p.name)  AS phase,
-                COALESCE(ip.instanz_farbe, p.farbe) AS phase_farbe,
-                p.reihenfolge AS phase_reihenfolge,
-                p.id AS phase_id,
+                COALESCE(si.instanz_phase_name,  ip.instanz_name,  p.name)  AS phase,
+                COALESCE(si.instanz_phase_farbe, ip.instanz_farbe, p.farbe) AS phase_farbe,
+                CASE WHEN si.instanz_phase_name IS NULL THEN p.reihenfolge END AS phase_reihenfolge,
+                CASE WHEN si.instanz_phase_name IS NULL THEN p.id END AS phase_id,
                 sv.reihenfolge AS vorlage_reihenfolge, sv.titel AS vorlage_titel,
                 sv.beschreibung,
                 COALESCE(si.instanz_titel, sv.titel)             AS titel,
@@ -67,7 +70,8 @@ function handleListSchritte(PDO $db, array $config, array $input): void
     $stmt->execute([':pid' => $prozessId]);
     $vorlagenSchritte = $stmt->fetchAll();
 
-    // Prozessspezifische Schritte (ohne Vorlage)
+    // Prozessspezifische Schritte (ohne Vorlage) – Phase ist hier immer schon
+    // ein freies Namens-/Farbfeld, kein COALESCE nötig.
     $stmtEigen = $db->prepare(
         'SELECT id, erledigt,
                 verantwortlich_anzeigename, verantwortlich_anzeigename AS verantwortlich_user,
@@ -75,7 +79,7 @@ function handleListSchritte(PDO $db, array $config, array $input): void
                 erledigt_am, erledigt_von,
                 kommentar, 0 AS kann_parallel, deaktiviert,
                 NULL AS instanz_titel, NULL AS instanz_reihenfolge,
-                phase_name AS phase, phase_farbe, 999 AS phase_reihenfolge,
+                phase_name AS phase, phase_farbe, NULL AS phase_reihenfolge,
                 reihenfolge AS vorlage_reihenfolge, titel AS vorlage_titel,
                 beschreibung,
                 titel, reihenfolge,
@@ -87,10 +91,180 @@ function handleListSchritte(PDO $db, array $config, array $input): void
     $stmtEigen->execute([':pid' => $prozessId]);
     $eigenSchritte = $stmtEigen->fetchAll();
 
-    // Zusammenführen: Vorlage-Schritte zuerst, dann eigene
     $alle = array_merge($vorlagenSchritte, $eigenSchritte);
 
+    // phase_reihenfolge korrigieren: für Schritte, deren Phase heute per
+    // instanz_phase_name/-farbe (oder als "eigen" schon immer) frei ist, statt
+    // an eine echte phasen-Zeile gebunden zu sein, gilt vorher weder p.reihenfolge
+    // (das wäre die HERKUNFTS-Phase, nicht die aktuelle) noch der alte feste
+    // Platzhalter 999 – stattdessen wird nach dem Namen der tatsächlich
+    // angezeigten Phase in diesem Prozess gesucht (auch eigene Phasen zählen),
+    // erst danach fällt es auf den Platzhalter zurück. Ohne diese Korrektur
+    // würde ein Schritt, der per Drag-and-drop in eine bestehende Phase
+    // verschoben wurde, dort mit falscher phase_reihenfolge einsortiert und
+    // könnte eine zweite Phasenüberschrift auslösen – dieselbe Fehlerklasse
+    // wie in tests/gruppierung.test.js.
+    $phasenReihenfolge = [];
+    foreach ($alle as $s) {
+        if ($s['phase_reihenfolge'] !== null && !array_key_exists($s['phase'], $phasenReihenfolge)) {
+            $phasenReihenfolge[$s['phase']] = (int) $s['phase_reihenfolge'];
+        }
+    }
+    $naechsterPlatzhalter = (empty($phasenReihenfolge) ? 0 : max($phasenReihenfolge)) + 1000;
+    foreach ($alle as &$s) {
+        if (array_key_exists($s['phase'], $phasenReihenfolge)) {
+            $s['phase_reihenfolge'] = $phasenReihenfolge[$s['phase']];
+        } elseif ($s['phase_reihenfolge'] === null) {
+            $s['phase_reihenfolge'] = $naechsterPlatzhalter;
+        }
+    }
+    unset($s);
+
+    // Sortierung, die zuvor komplett fehlte (weder ORDER BY in den Abfragen
+    // oben, noch beim Zusammenführen): nach Phase, dann nach Reihenfolge
+    // innerhalb der Phase, id als letzter, stabiler Tiebreaker. Ohne das blieb
+    // instanz_reihenfolge zwar speicherbar, wirkte sich aber in keiner der vier
+    // Ansichten sichtbar aus (siehe Bericht Schritt 2).
+    usort($alle, function ($a, $b) {
+        return $a['phase_reihenfolge'] <=> $b['phase_reihenfolge']
+            ?: strcmp((string) $a['phase'], (string) $b['phase'])
+            ?: ((int) $a['reihenfolge'] <=> (int) $b['reihenfolge'])
+            ?: ((int) $a['id'] <=> (int) $b['id']);
+    });
+
     Response::json(['prozess_id' => $prozessId, 'schritte' => $alle]);
+}
+
+/**
+ * Speichert die neue Reihenfolge (und ggf. den Phasenwechsel) einer Gruppe
+ * von Schritten innerhalb EINER Phase eines Prozesses – wird nach jeder
+ * Drag-and-drop- oder Pfeiltasten-Aktion in "Prozesse verwalten" aufgerufen.
+ *
+ * Bekommt die komplette neue Reihenfolge dieser einen Phase (voller Ersatz,
+ * wie schon bei handleReihenfolgeVorlagen/handleReihenfolgePhasen – siehe
+ * docs/ENTSCHEIDUNGEN.md zur Begründung "je Phase gezählt").
+ *
+ * Ändert die Phasen-Zuordnung eines Eintrags NUR, wenn seine aktuelle
+ * (aus der DB gelesene, nicht die vom Client behauptete) Phase von ziel_phase
+ * abweicht – reines Umsortieren innerhalb der angestammten Phase rührt
+ * instanz_phase_name/instanz_phase_farbe (bzw. bei eigenen Schritten
+ * phase_name/phase_farbe) also nicht an, ein Schritt bleibt so lange wie
+ * möglich an seiner Vorlage-Phase "dran" (folgt z. B. späteren Umbenennungen).
+ *
+ * Kein Versions-/Zeitstempel-Abgleich für gleichzeitige Bearbeitung –
+ * bewusst wie die beiden bestehenden Bulk-Endpunkte, siehe ENTSCHEIDUNGEN.md.
+ * Stattdessen ein struktureller Schutz: jeder Eintrag muss existieren und zu
+ * diesem Prozess gehören, sonst wird die GESAMTE Anfrage abgelehnt (409) statt
+ * teilweise übernommen – damit kann ein Schritt durch diesen Endpunkt nicht
+ * verschwinden.
+ *
+ * POST /api/prozesse/{prozess_id}/schritte/reihenfolge
+ * Body: { ziel_phase, ziel_phase_farbe, eintraege: [{id, typ: 'vorlage'|'eigen'}, ...] }
+ */
+function handleSchritteReihenfolge(PDO $db, array $config, array $input, array $params): void
+{
+    $prozessId = (int) $params['prozess_id'];
+    Guard::requireProzessVerantwortlich($db, $prozessId);
+
+    $zielPhase  = trim((string) ($input['ziel_phase'] ?? ''));
+    $zielFarbe  = (string) ($input['ziel_phase_farbe'] ?? '');
+    $eintraege  = $input['eintraege'] ?? null;
+
+    if ($zielPhase === '') Response::error('ziel_phase ist erforderlich.', 400);
+    if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $zielFarbe)) {
+        Response::error('ziel_phase_farbe muss #RRGGBB sein.', 400);
+    }
+    if (!is_array($eintraege) || empty($eintraege)) {
+        Response::error('eintraege (nicht-leeres Array) ist erforderlich.', 400);
+    }
+
+    $gesehen = [];
+    foreach ($eintraege as $e) {
+        $id  = (int) ($e['id']  ?? 0);
+        $typ = (string) ($e['typ'] ?? '');
+        if ($id <= 0 || !in_array($typ, ['vorlage', 'eigen'], true)) {
+            Response::error('Jeder Eintrag braucht id und typ ("vorlage"|"eigen").', 400);
+        }
+        $schluessel = $typ . ':' . $id;
+        if (isset($gesehen[$schluessel])) {
+            Response::error("Schritt $id ($typ) kommt mehrfach vor.", 400);
+        }
+        $gesehen[$schluessel] = true;
+    }
+
+    $vorlageAktuell = $db->prepare(
+        'SELECT si.prozess_id,
+                COALESCE(si.instanz_phase_name, ip.instanz_name, p.name) AS aktuelle_phase
+         FROM schritt_instanzen si
+         JOIN schritt_vorlagen sv ON sv.id = si.vorlage_id
+         JOIN phasen p ON p.id = sv.phase_id
+         LEFT JOIN instanz_phasen ip
+               ON ip.prozess_id = si.prozess_id AND ip.phase_id = p.id
+         WHERE si.id = :id'
+    );
+    $eigenAktuell = $db->prepare(
+        'SELECT prozess_id, phase_name AS aktuelle_phase FROM instanz_schritte WHERE id = :id'
+    );
+
+    // Erst validieren (jeder Eintrag existiert, gehört zu diesem Prozess) und
+    // dabei die jeweils aktuelle Phase merken – erst danach schreiben. So
+    // bleibt eine abgelehnte Anfrage ohne offene Transaktion, und kein
+    // Eintrag wird teilweise übernommen, bevor der Rest geprüft ist.
+    $geplant = [];
+    foreach (array_values($eintraege) as $index => $e) {
+        $id  = (int) $e['id'];
+        $typ = (string) $e['typ'];
+
+        $stmt = $typ === 'vorlage' ? $vorlageAktuell : $eigenAktuell;
+        $stmt->execute([':id' => $id]);
+        $aktuell = $stmt->fetch();
+
+        if (!$aktuell || (int) $aktuell['prozess_id'] !== $prozessId) {
+            Response::error("Schritt $id ($typ) gehört nicht zu diesem Prozess.", 409);
+        }
+
+        $geplant[] = [
+            'id' => $id, 'typ' => $typ, 'reihenfolge' => $index + 1,
+            'phasenwechsel' => $aktuell['aktuelle_phase'] !== $zielPhase,
+        ];
+    }
+
+    $updateVorlagePosition = $db->prepare(
+        'UPDATE schritt_instanzen SET instanz_reihenfolge = :r WHERE id = :id'
+    );
+    $updateVorlagePhase = $db->prepare(
+        'UPDATE schritt_instanzen
+            SET instanz_reihenfolge = :r, instanz_phase_name = :name, instanz_phase_farbe = :farbe
+          WHERE id = :id'
+    );
+    $updateEigenPosition = $db->prepare(
+        'UPDATE instanz_schritte SET reihenfolge = :r WHERE id = :id'
+    );
+    $updateEigenPhase = $db->prepare(
+        'UPDATE instanz_schritte
+            SET reihenfolge = :r, phase_name = :name, phase_farbe = :farbe
+          WHERE id = :id'
+    );
+
+    $db->beginTransaction();
+    try {
+        foreach ($geplant as $g) {
+            $werte = [':r' => $g['reihenfolge'], ':id' => $g['id']];
+            if ($g['phasenwechsel']) {
+                $werte[':name'] = $zielPhase;
+                $werte[':farbe'] = $zielFarbe;
+                ($g['typ'] === 'vorlage' ? $updateVorlagePhase : $updateEigenPhase)->execute($werte);
+            } else {
+                ($g['typ'] === 'vorlage' ? $updateVorlagePosition : $updateEigenPosition)->execute($werte);
+            }
+        }
+        $db->commit();
+    } catch (\Throwable $ex) {
+        $db->rollBack();
+        throw $ex;
+    }
+
+    Response::json(['ok' => true]);
 }
 
 function handleUpdateSchritt(PDO $db, array $config, array $input, array $params): void

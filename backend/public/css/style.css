@@ -432,6 +432,22 @@ main{
 .instanz-schritt-zeile.deaktiviert{
   opacity:.5; background:var(--paper-2);
 }
+.instanz-schritt-zeile.wird-gezogen{ opacity:.4; }
+
+/* Schritte verschieben: Pfeilschalter (Tastatur/Berührung) und
+   Zielphasen-Auswahl (Phasenwechsel) – siehe AUFTRAG-schritte-verschieben.md */
+.schritt-pfeile{ display:flex; gap:2px; flex-shrink:0; }
+.schritt-pfeil{
+  width:auto; font-size:11px; padding:3px 7px; line-height:1;
+}
+.schritt-phasen-ziel{
+  font-size:11px; border:1px solid var(--line); border-radius:4px;
+  padding:3px 4px; background:var(--paper); max-width:150px; flex-shrink:0;
+}
+.verschiebe-fehler{
+  background:var(--gefahr-flaeche); border:1px solid var(--gefahr); color:var(--gefahr);
+  border-radius:6px; padding:8px 12px; font-size:12.5px; margin-bottom:8px;
+}
 .instanz-titel-feld{
   flex:1; border:1px solid transparent; background:none; font-size:13px;
   padding:3px 6px; border-radius:4px; color:var(--ink);

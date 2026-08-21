@@ -94,6 +94,22 @@ Pro Schritt:
   Schritte aus der Vorlage lassen sich hier nicht löschen – sie gehören zur
   Vorlage und können nur ausgeblendet werden. Löschen ist dort in der
   Vorlagenverwaltung im Admin-Bereich möglich.
+- ⠿ ziehen zum Umsortieren (Maus) – auch in eine andere Phase, indem auf
+  einen anderen Phasenblock losgelassen wird
+- ↑ / ↓ verschiebt den Schritt innerhalb seiner Phase um eine Position –
+  ohne Maus bedienbar, auch per Fingertipp auf Tablets
+- „→ andere Phase …" wechselt die Phase des Schritts, angehängt ans Ende
+  der gewählten Phase – ebenfalls ohne Maus/per Fingertipp bedienbar. Neue
+  Phasen entstehen nicht dabei, dafür „Neue Phase anlegen" weiter unten.
+  Ein verschobener Vorlage-Schritt folgt danach nicht mehr Umbenennungen
+  seiner ursprünglichen Vorlage-Phase – reines Umsortieren innerhalb der
+  eigenen Phase ändert daran nichts.
+- Deaktivierte (ausgeblendete) Schritte lassen sich nicht verschieben,
+  solange sie ausgeblendet sind – erst nach „↩ reaktivieren".
+
+Ausgeblendete Schritte werden über einen Rückgabewert an die Ausgangsposition
+zurückgesetzt, wenn das Speichern einer Verschiebung fehlschlägt (z. B. bei
+Verbindungsproblemen) – eine Fehlermeldung erscheint oberhalb der Liste.
 
 **Eigene Phasen und Schritte:**
 - Phasenname eingeben, Farbe wählen
@@ -102,6 +118,9 @@ Pro Schritt:
 - Bestehende eigene Phasen: Name und Farbe direkt editierbar,
   Schritte umbenennbar, löschbar und nachträglich ergänzbar
 - „✕ Phase löschen" entfernt die eigene Phase mit allen ihren Schritten
+- Auch eigene Schritte lassen sich ziehen, per Pfeiltasten verschieben und
+  über „→ andere Phase …" in eine Vorlage-Phase oder eine andere eigene
+  Phase verschieben.
 
 ### Aktivitätsprotokoll
 Letzte 200 Aktionen dieses Prozesses, als CSV exportierbar.

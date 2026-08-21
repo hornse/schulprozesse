@@ -95,6 +95,24 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
   eingebunden) stellt einen Schritt nach, der über fremde Phasen hinweg ans
   Ende der Liste geschoben wird, und prüft, dass daraus keine zweite
   Phasenüberschrift entsteht.
+- **„Prozesse verwalten" zeigte nach einer phasenübergreifenden Verschiebung
+  eine scheinbar neue, doppelte Phase** – gemeldet unmittelbar nach der
+  Auslieferung von „Schritte verschieben". Ursache: `renderInstanzSchrittVerwaltung()`
+  baute Vorlage- und eigene Schritte bis dahin in zwei strikt nach `quelle`
+  getrennten Abschnitten auf, unabhängig davon, unter welchem Phasennamen ein
+  Schritt gerade tatsächlich lief. Ein verschobener Schritt bekam dadurch
+  einen zweiten Phasenblock mit demselben Namen statt sich der bestehenden
+  Phase anzuschließen – dieselbe Fehlerklasse wie die Dubletten-Überschrift
+  in Checkliste/Zeitstrahl (siehe oben), nur hier erst durch die neue
+  Verschiebefunktion erreichbar geworden. Behoben durch einen einzigen, über
+  `gruppiereNachPhase()` gruppierten Durchlauf für beide Herkünfte
+  gemeinsam; Umbenennen/Umfärben einer Phase nimmt jetzt auch bereits
+  „abgekoppelte" Mitglieder (verschobene Vorlage-Schritte, alle eigenen
+  Schritte) über den neuen Reihenfolge-Endpunkt mit, statt nur Schritte
+  derselben Herkunft. Dabei außerdem gefunden und behoben: ein Verweis auf
+  eine nirgends definierte Variable `alle` im alten Umfärben/Umbenennen-Code
+  für „eigene" Phasen – bis zu diesem Auftrag unerreichbar, weil eine
+  Vorlage-Phase vorher nie ohne `phase_id` vorkommen konnte.
 
 Geplant:
 - E-Mail-Erinnerungen bei überfälligen Schritten

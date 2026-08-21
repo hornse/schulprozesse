@@ -1782,635 +1782,410 @@ function renderInstanzSchrittVerwaltung() {
     </p>`;
   block.appendChild(header);
 
-  // ---- Teil 1: Vorlage-Schritte anpassen ----
+  // ---- Phasen und Schritte anpassen ----
+  // EIN gemeinsamer, nach Phase gruppierter Durchlauf über alle Schritte
+  // dieses Prozesses – gleich welcher Herkunft (Vorlage oder eigen). Bis
+  // 21.08.2026 gab es hier zwei getrennte Abschnitte, strikt nach s.quelle
+  // aufgeteilt: ein per Drag-and-drop in eine Vorlage-Phase verschobener
+  // eigener Schritt (oder umgekehrt) bekam dadurch einen zweiten,
+  // eigenständigen Phasenblock mit demselben Namen statt sich der
+  // bestehenden Phase anzuschließen – dieselbe Fehlerklasse wie die
+  // Dubletten-Phasenüberschrift in Checkliste/Zeitstrahl, nur hier durch die
+  // neue Verschiebefunktion erst ermöglicht. gruppiereNachPhase() gruppiert
+  // robust über den tatsächlich angezeigten Phasennamen, unabhängig von der
+  // Herkunft der einzelnen Zeile.
   const vorlagenTitel = document.createElement('h4');
   vorlagenTitel.style.cssText = 'font-size:13px;font-weight:600;margin:0 0 8px;';
-  vorlagenTitel.textContent = 'Vorlage-Schritte anpassen';
+  vorlagenTitel.textContent = 'Phasen und Schritte anpassen';
   block.appendChild(vorlagenTitel);
 
   const liste = document.createElement('div');
   liste.className = 'instanz-schritte-liste';
   block.appendChild(liste);
 
-  // STATE.schritte direkt verwenden (bereits aktuell nach ladeAlles/render)
-  // Für deaktivierte Schritte zusätzlich laden
-  const renderVorlagenSchritte = (nurVorlagen) => {
-    liste.innerHTML = '';
-    if (nurVorlagen.length === 0) {
-      liste.innerHTML = '<p style="font-size:12px;color:var(--muted);">Keine Vorlage-Schritte vorhanden.</p>';
-      return;
+  const schritteReload = async () => {
+    const [res, resAlle] = await Promise.all([
+      api(`/api/schritte?prozess_id=${STATE.prozessId}`),
+      api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
+    ]);
+    STATE.schritte     = res.schritte;
+    STATE.schritteAlle = resAlle.schritte;
+    render();
+  };
+
+  // Schreibt Name/Farbe für ALLE aktuellen Mitglieder einer Phasengruppe,
+  // gleich welcher Herkunft. phaseId vorhanden: Kern über instanz_phasen
+  // (nicht verschobene Vorlage-Schritte folgen damit auch künftigen
+  // Umbenennungen weiter automatisch, siehe COALESCE-Kette in
+  // handleListSchritte), bereits abgekoppelte Mitglieder (phase_id === null:
+  // verschobene Vorlage-Schritte, alle eigenen Schritte) werden zusätzlich
+  // explizit mitgenommen, sonst blieben sie unter dem alten Namen zurück.
+  // Ohne phaseId (reine eigene Phase): alle Mitglieder direkt umschreiben.
+  async function benennePhaseUm(gruppe, phaseId, neuerName, neueFarbe) {
+    if (phaseId) {
+      const body = {};
+      if (neuerName !== gruppe.phase) body.instanz_name = neuerName;
+      if (neueFarbe !== gruppe.phase_farbe) body.instanz_farbe = neueFarbe;
+      if (Object.keys(body).length > 0) {
+        await api(`/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
+          { method: 'POST', body });
+      }
+      const abgekoppelt = gruppe.schritte.filter((sc) => !sc.phase_id);
+      if (abgekoppelt.length > 0) {
+        const eintraege = [...abgekoppelt]
+          .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0))
+          .map((sc) => ({ id: sc.id, typ: sc.quelle === 'eigen' ? 'eigen' : 'vorlage' }));
+        await schritteReihenfolgeSpeichern(STATE.prozessId, neuerName, neueFarbe, eintraege);
+      }
+    } else {
+      const eintraege = [...gruppe.schritte]
+        .sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0))
+        .map((sc) => ({ id: sc.id, typ: sc.quelle === 'eigen' ? 'eigen' : 'vorlage' }));
+      await schritteReihenfolgeSpeichern(STATE.prozessId, neuerName, neueFarbe, eintraege);
     }
+    await schritteReload();
+  }
 
-    // phase_id aus nurVorlagen selbst holen (zuverlässig)
-    function getPhaseId(phaseName) {
-      const gefunden = nurVorlagen.find((sc) => sc.phase === phaseName && sc.phase_id);
-      return gefunden?.phase_id ?? null;
-    }
+  function renderPhasenBlockVerwaltung(gruppe) {
+    const phaseId = gruppe.schritte.find((sc) => sc.phase_id)?.phase_id ?? null;
+    const istEigenPhase = !phaseId;
 
-    // WICHTIG: nach Phase gruppiert sortieren. neuerPhaseBlock() legt bei
-    // jedem Phasenwechsel einen Block an – sind die Schritte nicht am Stück
-    // sortiert, entstehen Duplikat-Blöcke derselben Phase.
-    nurVorlagen = [...nurVorlagen].sort((a, b) =>
-      (a.phase_reihenfolge ?? 0) - (b.phase_reihenfolge ?? 0)
-      || String(a.phase).localeCompare(String(b.phase))
-      || (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0)
-      || (a.id ?? 0) - (b.id ?? 0)
-    );
+    const phaseBlock = document.createElement('div');
+    phaseBlock.className = 'phasen-block';
+    phaseBlock.style.setProperty('--phase-farbe', gruppe.phase_farbe);
+    phaseBlock.style.marginBottom = '6px';
 
-    let aktuellePhase = null;
-      let aktuellerPhaseBlock = null;
-      let aktuelleSchrittListe = null;
+    const kopf = document.createElement('div');
+    kopf.className = 'phasen-kopf';
 
-      function neuerPhaseBlock(s) {
-        const phaseBlock = document.createElement('div');
-        phaseBlock.className = 'phasen-block';
-        phaseBlock.style.setProperty('--phase-farbe', s.phase_farbe);
-        phaseBlock.style.marginBottom = '6px';
+    // Farb-Button mit Popup
+    const farbBtn = document.createElement('button');
+    farbBtn.type = 'button';
+    farbBtn.style.cssText = `background:${gruppe.phase_farbe};width:22px;height:22px;border-radius:4px;border:2px solid rgba(0,0,0,.15);cursor:pointer;flex-shrink:0;`;
+    const farbPopup = document.createElement('div');
+    farbPopup.className = 'farb-popup';
+    farbPopup.style.display = 'none';
+    farbPopup.appendChild(renderFarbwahl(gruppe.phase_farbe, async (f) => {
+      farbBtn.style.background = f;
+      phaseBlock.style.setProperty('--phase-farbe', f);
+      try { await benennePhaseUm(gruppe, phaseId, gruppe.phase, f); }
+      catch (err) { alert('Fehler beim Ändern der Farbe: ' + err.message); }
+    }));
+    farbBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      farbPopup.style.display = farbPopup.style.display === 'none' ? 'block' : 'none';
+    });
+    document.addEventListener('click', () => { farbPopup.style.display = 'none'; });
+    const farbWrap = document.createElement('div');
+    farbWrap.style.position = 'relative';
+    farbWrap.appendChild(farbBtn);
+    farbWrap.appendChild(farbPopup);
 
-        const kopf = document.createElement('div');
-        kopf.className = 'phasen-kopf';
+    // Name-Feld
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'phasen-name-feld';
+    nameInput.value = gruppe.phase.replace(/^\d+\.\s*/, '');
+    nameInput.placeholder = 'Phasenname';
+    nameInput.addEventListener('change', async () => {
+      const neuerName = nameInput.value.trim();
+      if (!neuerName || neuerName === gruppe.phase) return;
+      try { await benennePhaseUm(gruppe, phaseId, neuerName, gruppe.phase_farbe); }
+      catch (err) { alert('Fehler beim Umbenennen: ' + err.message); }
+    });
 
-        // phase_id zuverlässig aus STATE.schritte holen
-        const phaseId = getPhaseId(s.phase);
-        const istEigenPhase = (s.quelle === 'eigen') || !phaseId;
+    const btnLeiste = document.createElement('span');
+    btnLeiste.style.cssText = 'display:flex;gap:4px;margin-left:auto;flex-shrink:0;';
 
-        let aktFarbe = s.phase_farbe;
-
-        // Farb-Button mit Popup
-        const farbBtn = document.createElement('button');
-        farbBtn.type = 'button';
-        farbBtn.style.cssText = `background:${aktFarbe};width:22px;height:22px;border-radius:4px;border:2px solid rgba(0,0,0,.15);cursor:pointer;flex-shrink:0;`;
-        const farbPopup = document.createElement('div');
-        farbPopup.className = 'farb-popup';
-        farbPopup.style.display = 'none';
-
-        farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
-          aktFarbe = f;
-          farbBtn.style.background = f;
-          phaseBlock.style.setProperty('--phase-farbe', f);
-          if (istEigenPhase) {
-            // Eigene Phase: Farbe aller Schritte dieser Phase aktualisieren
-            const schritteDieserPhase = alle.filter(
-              (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
-            );
-            for (const sc of schritteDieserPhase) {
-              await api(`/api/instanz-schritte/${sc.id}`, {
-                method: 'PATCH', body: { phase_farbe: f }
-              });
-            }
-          } else {
-            // Vorlage-Phase: instanz_phasen API
-            await api(
-              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
-              { method: 'POST', body: { instanz_farbe: f } }
-            );
+    if (istEigenPhase) {
+      const loeschBtn = document.createElement('button');
+      loeschBtn.type = 'button';
+      loeschBtn.className = 'btn-sekundaer btn btn-gefahr';
+      loeschBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
+      loeschBtn.textContent = '🗑 Phase';
+      loeschBtn.title = 'Diese eigene Phase mit allen Schritten löschen';
+      loeschBtn.addEventListener('click', async () => {
+        const eigene = gruppe.schritte.filter((sc) => sc.quelle === 'eigen');
+        const verschobeneVorlage = gruppe.schritte.filter((sc) => sc.quelle !== 'eigen');
+        const hinweis = verschobeneVorlage.length > 0
+          ? ` ${verschobeneVorlage.length} hierher verschobene(r) Vorlage-Schritt(e) werden dabei nur ausgeblendet, nicht gelöscht.`
+          : '';
+        if (!confirm(`Phase „${gruppe.phase}" und ${eigene.length} eigene(n) Schritt(e) löschen?${hinweis}`)) return;
+        try {
+          for (const sc of eigene) {
+            await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
           }
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          // Nur Phasenfarben im DOM aktualisieren ohne Seitensprung
-          aktualisierePhaseImDOM(s.phase, f, null);
-        }));
-        farbBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          farbPopup.style.display = farbPopup.style.display === 'none' ? 'block' : 'none';
-        });
-        const farbWrap = document.createElement('div');
-        farbWrap.style.position = 'relative';
-        farbWrap.appendChild(farbBtn);
-        farbWrap.appendChild(farbPopup);
-
-        // Name-Feld
-        const nameInput = document.createElement('input');
-        nameInput.type = 'text';
-        nameInput.className = 'phasen-name-feld';
-        nameInput.value = s.phase.replace(/^\d+\.\s*/, '');
-        nameInput.placeholder = 'Phasenname';
-        nameInput.addEventListener('change', async () => {
-          const neuerName = nameInput.value.trim();
-          if (!neuerName) return;
-          if (istEigenPhase) {
-            // Eigene Phase: phase_name aller Schritte dieser Phase aktualisieren
-            const schritteDieserPhase = alle.filter(
-              (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
-            );
-            for (const sc of schritteDieserPhase) {
-              await api(`/api/instanz-schritte/${sc.id}`, {
-                method: 'PATCH', body: { phase_name: neuerName }
-              });
-            }
-          } else {
-            await api(
-              `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
-              { method: 'POST', body: { instanz_name: neuerName } }
-            );
+          for (const sc of verschobeneVorlage) {
+            await api(`/api/schritte/${sc.id}`, { method: 'PATCH', body: { deaktiviert: 1 } });
           }
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          // Nur Phasennamen im DOM aktualisieren ohne Seitensprung
-          aktualisierePhaseImDOM(s.phase, null, neuerName);
-        });
-
-        // Zurücksetzen: zwei Stufen für Vorlage-Phasen, Löschen für eigene Phasen
-        const schritteReload = async () => {
-          const [res, resAlle] = await Promise.all([
-            api(`/api/schritte?prozess_id=${STATE.prozessId}`),
-            api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
-          ]);
-          STATE.schritte     = res.schritte;
-          STATE.schritteAlle = resAlle.schritte;
-          render();
-        };
-
-        const btnLeiste = document.createElement('span');
-        btnLeiste.style.cssText = 'display:flex;gap:4px;margin-left:auto;flex-shrink:0;';
-
-        if (istEigenPhase) {
-          const loeschBtn = document.createElement('button');
-          loeschBtn.type = 'button';
-          loeschBtn.className = 'btn-sekundaer btn btn-gefahr';
-          loeschBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
-          loeschBtn.textContent = '🗑 Phase';
-          loeschBtn.title = 'Diese eigene Phase mit allen Schritten löschen';
-          loeschBtn.addEventListener('click', async () => {
-            const schritteDieserPhase = nurVorlagen.filter(
-              (sc) => sc.phase === s.phase && sc.quelle === 'eigen'
-            );
-            if (!confirm(`Phase „${s.phase}" und ${schritteDieserPhase.length} Schritt(e) löschen?`)) return;
-            try {
-              for (const sc of schritteDieserPhase) {
-                await api(`/api/instanz-schritte/${sc.id}`, { method: 'DELETE' });
-              }
-              await schritteReload();
-            } catch (err) {
-              alert('Fehler beim Löschen: ' + err.message);
-            }
-          });
-          btnLeiste.appendChild(loeschBtn);
-        } else {
-          // Stufe 1 – nur Phasenname und -farbe
-          const resetPhaseBtn = document.createElement('button');
-          resetPhaseBtn.type = 'button';
-          resetPhaseBtn.className = 'btn-sekundaer btn';
-          resetPhaseBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
-          resetPhaseBtn.textContent = '↺ Phase';
-          resetPhaseBtn.title = 'Nur Phasenname und -farbe auf Vorlage zurücksetzen';
-          resetPhaseBtn.addEventListener('click', async () => {
-            if (!phaseId) {
-              alert('Fehler: Phase-ID nicht gefunden. Bitte Seite neu laden.');
-              return;
-            }
-            try {
-              await api(
-                `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
-                { method: 'DELETE', body: { umfang: 'phase' } }
-              );
-              await schritteReload();
-            } catch (err) {
-              alert('Fehler beim Zurücksetzen: ' + err.message);
-            }
-          });
-
-          // Stufe 2 – zusätzlich Schritt-Umbenennungen und Ausgeblendete
-          const resetAllesBtn = document.createElement('button');
-          resetAllesBtn.type = 'button';
-          resetAllesBtn.className = 'btn-sekundaer btn';
-          resetAllesBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
-          resetAllesBtn.textContent = '↺ Alles';
-          resetAllesBtn.title = 'Phase, Schritt-Umbenennungen und ausgeblendete Schritte zurücksetzen';
-          resetAllesBtn.addEventListener('click', async () => {
-            if (!phaseId) {
-              alert('Fehler: Phase-ID nicht gefunden. Bitte Seite neu laden.');
-              return;
-            }
-            if (!confirm(
-              `Alle Anpassungen der Phase „${s.phase}" zurücksetzen?\n\n` +
-              '• Phasenname und -farbe\n' +
-              '• Umbenannte Schritte erhalten wieder ihren Vorlage-Titel\n' +
-              '• Ausgeblendete Schritte werden wieder eingeblendet\n\n' +
-              'Selbst hinzugefügte Schritte bleiben erhalten.'
-            )) return;
-            try {
-              await api(
-                `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
-                { method: 'DELETE', body: { umfang: 'alles' } }
-              );
-              await schritteReload();
-            } catch (err) {
-              alert('Fehler beim Zurücksetzen: ' + err.message);
-            }
-          });
-
-          btnLeiste.appendChild(resetPhaseBtn);
-          btnLeiste.appendChild(resetAllesBtn);
+          await schritteReload();
+        } catch (err) {
+          alert('Fehler beim Löschen: ' + err.message);
         }
+      });
+      btnLeiste.appendChild(loeschBtn);
+    } else {
+      // Stufe 1 – nur Phasenname und -farbe
+      const resetPhaseBtn = document.createElement('button');
+      resetPhaseBtn.type = 'button';
+      resetPhaseBtn.className = 'btn-sekundaer btn';
+      resetPhaseBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
+      resetPhaseBtn.textContent = '↺ Phase';
+      resetPhaseBtn.title = 'Nur Phasenname und -farbe auf Vorlage zurücksetzen';
+      resetPhaseBtn.addEventListener('click', async () => {
+        try {
+          await api(
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
+            { method: 'DELETE', body: { umfang: 'phase' } }
+          );
+          await schritteReload();
+        } catch (err) {
+          alert('Fehler beim Zurücksetzen: ' + err.message);
+        }
+      });
 
-        kopf.appendChild(farbWrap);
-        kopf.appendChild(nameInput);
-        kopf.appendChild(btnLeiste);
-        phaseBlock.appendChild(kopf);
+      // Stufe 2 – zusätzlich Schritt-Umbenennungen und Ausgeblendete
+      const resetAllesBtn = document.createElement('button');
+      resetAllesBtn.type = 'button';
+      resetAllesBtn.className = 'btn-sekundaer btn';
+      resetAllesBtn.style.cssText = 'width:auto;font-size:10px;padding:2px 6px;';
+      resetAllesBtn.textContent = '↺ Alles';
+      resetAllesBtn.title = 'Phase, Schritt-Umbenennungen und ausgeblendete Schritte zurücksetzen';
+      resetAllesBtn.addEventListener('click', async () => {
+        if (!confirm(
+          `Alle Anpassungen der Phase „${gruppe.phase}" zurücksetzen?\n\n` +
+          '• Phasenname und -farbe\n' +
+          '• Umbenannte Schritte erhalten wieder ihren Vorlage-Titel\n' +
+          '• Ausgeblendete Schritte werden wieder eingeblendet\n\n' +
+          'Selbst hinzugefügte Schritte und hierher verschobene Schritte bleiben erhalten.'
+        )) return;
+        try {
+          await api(
+            `/api/prozesse/${STATE.prozessId}/instanz-phasen/${phaseId}`,
+            { method: 'DELETE', body: { umfang: 'alles' } }
+          );
+          await schritteReload();
+        } catch (err) {
+          alert('Fehler beim Zurücksetzen: ' + err.message);
+        }
+      });
 
-        const schrittListe = document.createElement('div');
-        schrittListe.className = 'vorlagen-liste';
-        phaseBlock.appendChild(schrittListe);
-        schrittListe.addEventListener('dragover', (e) => { if (ziehSchrittId != null) e.preventDefault(); });
-        schrittListe.addEventListener('drop', (e) => {
-          if (ziehSchrittId == null) return;
-          e.preventDefault();
-          const zielEl = e.target.closest('[data-schritt-id]');
-          const zielSchrittId = zielEl ? Number(zielEl.dataset.schrittId) : null;
-          const zi = zielIndexAusDrop(ziehSchrittId, s.phase, zielSchrittId);
-          const id = ziehSchrittId;
-          ziehSchrittId = null;
-          schrittVerschieben(id, s.phase, zi);
+      btnLeiste.appendChild(resetPhaseBtn);
+      btnLeiste.appendChild(resetAllesBtn);
+    }
+
+    kopf.appendChild(farbWrap);
+    kopf.appendChild(nameInput);
+    kopf.appendChild(btnLeiste);
+    phaseBlock.appendChild(kopf);
+
+    const schrittListe = document.createElement('div');
+    schrittListe.className = 'vorlagen-liste';
+    phaseBlock.appendChild(schrittListe);
+    schrittListe.addEventListener('dragover', (e) => { if (ziehSchrittId != null) e.preventDefault(); });
+    schrittListe.addEventListener('drop', (e) => {
+      if (ziehSchrittId == null) return;
+      e.preventDefault();
+      const zielEl = e.target.closest('[data-schritt-id]');
+      const zielSchrittId = zielEl ? Number(zielEl.dataset.schrittId) : null;
+      const zi = zielIndexAusDrop(ziehSchrittId, gruppe.phase, zielSchrittId);
+      const id = ziehSchrittId;
+      ziehSchrittId = null;
+      schrittVerschieben(id, gruppe.phase, zi);
+    });
+
+    for (const s of [...gruppe.schritte].sort((a, b) => (a.reihenfolge ?? 0) - (b.reihenfolge ?? 0))) {
+      schrittListe.appendChild(renderSchrittZeileVerwaltung(s, phaseId, schritteReload));
+    }
+
+    // Neuen Schritt zu dieser Phase hinzufügen – bei einer echten
+    // Vorlage-Phase als prozesseigene Vorlage-Instanz, bei einer eigenen
+    // Phase als instanz_schritte-Zeile.
+    const addReihe = document.createElement('div');
+    addReihe.style.cssText = 'display:flex;gap:8px;margin:6px 8px 10px;';
+    const addInput = document.createElement('input');
+    addInput.type = 'text';
+    addInput.placeholder = 'Weiterer Schritt...';
+    addInput.style.cssText = 'flex:1;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;';
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn';
+    addBtn.style.cssText = 'width:auto;';
+    addBtn.textContent = '+';
+    const doAdd = async () => {
+      const titel = addInput.value.trim();
+      if (!titel) return;
+      addBtn.disabled = true;
+      try {
+        if (phaseId) {
+          await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`, {
+            method: 'POST', body: { titel }
+          });
+        } else {
+          await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
+            method: 'POST', body: { titel, phase_name: gruppe.phase, phase_farbe: gruppe.phase_farbe }
+          });
+        }
+        await schritteReload();
+      } catch (err) {
+        alert('Fehler: ' + err.message);
+        addBtn.disabled = false;
+      }
+    };
+    addBtn.addEventListener('click', doAdd);
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+    });
+    addReihe.appendChild(addInput);
+    addReihe.appendChild(addBtn);
+    phaseBlock.appendChild(addReihe);
+
+    return phaseBlock;
+  }
+
+  function renderSchrittZeileVerwaltung(s, gruppenPhaseId, schritteReload) {
+    const istEigen = s.quelle === 'eigen';
+    const zeile = document.createElement('div');
+    zeile.className = 'instanz-schritt-zeile' + (s.deaktiviert ? ' deaktiviert' : '');
+    zeile.dataset.schrittId = s.id;
+    const origTitel = s.vorlage_titel ?? s.titel ?? '';
+    const anzeigetitel = s.instanz_titel ?? origTitel;
+    // Löschbar: eigene Schritte immer, Vorlage-Schritte nur wenn ausdrücklich
+    // für diesen Prozess angelegt ("nur hier") – echte Vorlage-Schritte
+    // lassen sich hier nur ausblenden.
+    const nurHier = !!s.nur_dieser_prozess;
+    const loeschbar = istEigen || nurHier;
+    zeile.innerHTML = `
+      ${s.deaktiviert ? '' : '<span class="zieh-griff" draggable="true" title="Ziehen zum Umsortieren">⠿</span>'}
+      <input type="text" class="instanz-titel-feld"
+             value="${anzeigetitel.replace(/"/g, '&quot;')}"
+             placeholder="${origTitel.replace(/"/g, '&quot;')}"
+             title="Umbenennen (nur für diesen Prozess)">
+      <span class="instanz-orig">${(!istEigen && s.instanz_titel) ? '← ' + origTitel : ''}</span>
+      ${istEigen ? '<span class="schritt-badge" title="Eigener Schritt, nur in diesem Prozess">eigen</span>'
+                 : (nurHier ? '<span class="schritt-badge" title="Nur in diesem Prozess">nur hier</span>' : '')}
+      ${istEigen ? '' : `<button class="btn-sekundaer btn" data-dup
+              style="width:auto;font-size:11px;padding:3px 8px;" title="Schritt duplizieren">⎘</button>`}
+      <button class="btn-sekundaer btn" data-toggle-deakt
+              style="width:auto;font-size:11px;padding:3px 8px;">
+        ${s.deaktiviert ? '↩ reaktivieren' : '✕ ausblenden'}
+      </button>
+      ${loeschbar ? `<button class="btn-sekundaer btn btn-gefahr" data-loeschen
+              style="width:auto;font-size:11px;padding:3px 8px;"
+              title="Diesen Schritt endgültig löschen">🗑</button>` : ''}`;
+
+    if (!s.deaktiviert) {
+      zeile.querySelector('.zieh-griff').addEventListener('dragstart', (e) => {
+        ziehSchrittId = s.id; zeile.classList.add('wird-gezogen'); e.dataTransfer.effectAllowed = 'move';
+      });
+      zeile.querySelector('.zieh-griff').addEventListener('dragend', () => {
+        zeile.classList.remove('wird-gezogen'); ziehSchrittId = null;
+      });
+      zeile.appendChild(renderPfeilSchalter(s));
+      zeile.appendChild(renderPhasenZielAuswahl(s));
+    }
+
+    const titelFeld = zeile.querySelector('.instanz-titel-feld');
+    const origSpan  = zeile.querySelector('.instanz-orig');
+
+    async function speichereTitel() {
+      const neuerTitel = titelFeld.value.trim();
+      const gespeicherterTitel = neuerTitel || null;
+
+      if (istEigen) {
+        await api(`/api/instanz-schritte/${s.id}`, {
+          method: 'PATCH', body: { titel: neuerTitel || s.vorlage_titel }
         });
-
-        // Neuen eigenen Schritt zu dieser Vorlage-Phase hinzufügen
-        const addReihe = document.createElement('div');
-        addReihe.style.cssText = 'display:flex;gap:8px;margin:6px 8px 10px;';
-        const addInput = document.createElement('input');
-        addInput.type = 'text';
-        addInput.placeholder = 'Weiterer Schritt für diesen Prozess...';
-        addInput.style.cssText = 'flex:1;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;';
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'btn';
-        addBtn.style.cssText = 'width:auto;';
-        addBtn.textContent = '+';
-        const doAdd = async () => {
-          const titel = addInput.value.trim();
-          if (!titel) return;
-          if (!phaseId) {
-            alert('Fehler: phase_id nicht gefunden (' + s.phase + '). Bitte Seite neu laden.');
-            return;
-          }
-          addBtn.disabled = true;
-          try {
-            const result = await api(`/api/prozesse/${STATE.prozessId}/phasen/${phaseId}/schritte`, {
-              method: 'POST',
-              body: { titel }
-            });
-            const [res, resAlle] = await Promise.all([
-              api(`/api/schritte?prozess_id=${STATE.prozessId}`),
-              api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
-            ]);
-            STATE.schritte     = res.schritte;
-            STATE.schritteAlle = resAlle.schritte;
-            render();
-          } catch (err) {
-            alert('Fehler: ' + err.message);
-            addBtn.disabled = false;
-          }
-        };
-        addBtn.addEventListener('click', doAdd);
-        addInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') { e.preventDefault(); doAdd(); }
+      } else {
+        await api(`/api/schritte/${s.id}`, {
+          method: 'PATCH', body: { instanz_titel: gespeicherterTitel }
         });
-        addReihe.appendChild(addInput);
-        addReihe.appendChild(addBtn);
-        phaseBlock.appendChild(addReihe);
-
-        liste.appendChild(phaseBlock);
-        return { phaseBlock, schrittListe };
       }
 
-      nurVorlagen.forEach((s) => {
-        if (s.phase !== aktuellePhase) {
-          aktuellePhase = s.phase;
-          const { phaseBlock, schrittListe } = neuerPhaseBlock(s);
-          aktuellerPhaseBlock = phaseBlock;
-          aktuelleSchrittListe = schrittListe;
+      // Checklisten-DOM sofort aktualisieren ohne Neuladen
+      document.querySelectorAll('.schritt-text').forEach((el) => {
+        if (el.closest('.schritt')?.dataset?.schrittId === String(s.id) &&
+            el.closest('.schritt')?.dataset?.quelle === (s.quelle ?? 'vorlage')) {
+          el.textContent = neuerTitel || origTitel;
         }
-        const zeile = document.createElement('div');
-        zeile.className = 'instanz-schritt-zeile' + (s.deaktiviert ? ' deaktiviert' : '');
-        zeile.dataset.schrittId = s.id;
-        const origTitel = s.vorlage_titel ?? s.titel ?? '';
-        const anzeigetitel = s.instanz_titel ?? origTitel;
-        // Nur für diesen Prozess angelegte Schritte dürfen gelöscht werden;
-        // echte Vorlage-Schritte können hier nur ausgeblendet werden.
-        const nurHier = !!s.nur_dieser_prozess;
-        zeile.innerHTML = `
-          ${s.deaktiviert ? '' : '<span class="zieh-griff" draggable="true" title="Ziehen zum Umsortieren">⠿</span>'}
-          <input type="text" class="instanz-titel-feld"
-                 value="${anzeigetitel.replace(/"/g, '&quot;')}"
-                 placeholder="${origTitel.replace(/"/g, '&quot;')}"
-                 title="Umbenennen (nur für diesen Prozess)">
-          <span class="instanz-orig">${s.instanz_titel ? '← ' + origTitel : ''}</span>
-          ${nurHier ? '<span class="schritt-badge" title="Nur in diesem Prozess">nur hier</span>' : ''}
-          <button class="btn-sekundaer btn" data-dup
-                  style="width:auto;font-size:11px;padding:3px 8px;" title="Schritt duplizieren">⎘</button>
-          <button class="btn-sekundaer btn" data-toggle-deakt
-                  style="width:auto;font-size:11px;padding:3px 8px;">
-            ${s.deaktiviert ? '↩ reaktivieren' : '✕ ausblenden'}
-          </button>
-          ${nurHier ? `<button class="btn-sekundaer btn btn-gefahr" data-loeschen
-                  style="width:auto;font-size:11px;padding:3px 8px;"
-                  title="Diesen Schritt endgültig löschen">🗑</button>` : ''}`;
-
-        if (!s.deaktiviert) {
-          zeile.querySelector('.zieh-griff').addEventListener('dragstart', (e) => {
-            ziehSchrittId = s.id; zeile.classList.add('wird-gezogen'); e.dataTransfer.effectAllowed = 'move';
-          });
-          zeile.querySelector('.zieh-griff').addEventListener('dragend', () => {
-            zeile.classList.remove('wird-gezogen'); ziehSchrittId = null;
-          });
-          zeile.appendChild(renderPfeilSchalter(s));
-          zeile.appendChild(renderPhasenZielAuswahl(s));
-        }
-
-        const titelFeld = zeile.querySelector('.instanz-titel-feld');
-        const origSpan  = zeile.querySelector('.instanz-orig');
-
-        async function speichereTitel() {
-          const neuerTitel = titelFeld.value.trim();
-          const gespeicherterTitel = neuerTitel || null;
-
-          if (s.quelle === 'eigen') {
-            // Eigener Schritt: titel direkt in instanz_schritte speichern
-            await api(`/api/instanz-schritte/${s.id}`, {
-              method: 'PATCH', body: { titel: neuerTitel || s.vorlage_titel }
-            });
-            const gefunden = STATE.schritte.find(
-              (sc) => sc.id === s.id && sc.quelle === 'eigen'
-            );
-            if (gefunden) { gefunden.titel = neuerTitel; gefunden.vorlage_titel = neuerTitel; }
-          } else {
-            // Vorlage-Schritt: instanz_titel in schritt_instanzen speichern
-            await api(`/api/schritte/${s.id}`, {
-              method: 'PATCH', body: { instanz_titel: gespeicherterTitel }
-            });
-            const gefunden = STATE.schritte.find(
-              (sc) => sc.id === s.id && sc.quelle !== 'eigen'
-            );
-            if (gefunden) {
-              gefunden.instanz_titel = gespeicherterTitel;
-              gefunden.titel = gespeicherterTitel ?? gefunden.vorlage_titel;
-            }
-          }
-
-          // Checklisten-DOM sofort aktualisieren ohne Neuladen
-          document.querySelectorAll('.schritt-text').forEach((el) => {
-            if (el.closest('.schritt')?.dataset?.schrittId === String(s.id) &&
-                el.closest('.schritt')?.dataset?.quelle === (s.quelle ?? 'vorlage')) {
-              el.textContent = neuerTitel || origTitel;
-            }
-          });
-
-          // Visuelles Feedback
-          origSpan.textContent = (s.quelle !== 'eigen' && gespeicherterTitel)
-            ? '← ' + origTitel : '';
-          titelFeld.style.background = '#e8f5e9';
-          setTimeout(() => { titelFeld.style.background = ''; }, 800);
-        }
-
-        titelFeld.addEventListener('blur', speichereTitel);
-        titelFeld.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') { e.preventDefault(); titelFeld.blur(); }
-        });
-
-        zeile.querySelector('[data-dup]').addEventListener('click', async () => {
-          const neuerTitel = prompt(`Titel der Kopie:\n(leer für "${origTitel} (Kopie)")`) ?? '';
-          if (neuerTitel === null) return;
-          try {
-            await api(`/api/schritte/${s.id}/duplizieren`, {
-              method: 'POST',
-              body: {
-                titel: neuerTitel,
-                ziel_prozess_id: STATE.prozessId,
-                ziel_phase_id: s.phase_id,
-              },
-            });
-            const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-            STATE.schritte = res.schritte;
-            render();
-          } catch (err) { alert('Fehler: ' + err.message); }
-        });
-
-        const loeschBtnZeile = zeile.querySelector('[data-loeschen]');
-        if (loeschBtnZeile) {
-          loeschBtnZeile.addEventListener('click', async () => {
-            if (!confirm(
-              `Schritt „${anzeigetitel}" endgültig löschen?\n\n` +
-              'Der Schritt gehört nur zu diesem Prozess und kann nicht ' +
-              'wiederhergestellt werden.'
-            )) return;
-            try {
-              await api(`/api/schritte/${s.id}`, { method: 'DELETE' });
-              const [res, resAlle] = await Promise.all([
-                api(`/api/schritte?prozess_id=${STATE.prozessId}`),
-                api(`/api/schritte?prozess_id=${STATE.prozessId}&alle=1`),
-              ]);
-              STATE.schritte     = res.schritte;
-              STATE.schritteAlle = resAlle.schritte;
-              render();
-            } catch (err) {
-              alert('Fehler beim Löschen: ' + err.message);
-            }
-          });
-        }
-
-        zeile.querySelector('[data-toggle-deakt]').addEventListener('click', async () => {
-          await api(`/api/schritte/${s.id}`, {
-            method: 'PATCH', body: { deaktiviert: s.deaktiviert ? 0 : 1 }
-          });
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          // Zeile visuell aktualisieren ohne Seitensprung
-          zeile.classList.toggle('deaktiviert', !s.deaktiviert);
-          zeile.querySelector('[data-toggle-deakt]').textContent =
-            s.deaktiviert ? '✕ ausblenden' : '↩ reaktivieren';
-          s.deaktiviert = s.deaktiviert ? 0 : 1;
-        });
-        aktuelleSchrittListe.appendChild(zeile);
       });
-  }; // Ende renderVorlagenSchritte
 
-  // STATE.schritteAlle enthält alle Schritte inkl. deaktivierter
-  // (wird beim Prozess-Wechsel synchron geladen)
-  const nurVorlagen = (STATE.schritteAlle || STATE.schritte)
-    .filter((s) => s.quelle !== 'eigen');
-  renderVorlagenSchritte(nurVorlagen);
+      origSpan.textContent = (!istEigen && gespeicherterTitel) ? '← ' + origTitel : '';
+      titelFeld.style.background = '#e8f5e9';
+      setTimeout(() => { titelFeld.style.background = ''; }, 800);
 
-  // ---- Teil 2: Eigene Phasen und Schritte ----
-  const sep = document.createElement('hr');
-  sep.style.cssText = 'border:none;border-top:1px solid var(--line);margin:20px 0;';
-  block.appendChild(sep);
+      // Titel im in-memory-Stand nachziehen, damit ein Re-Render (z. B. nach
+      // einer Verschiebung) nicht auf den alten Titel zurückfällt.
+      const gefunden = STATE.schritte.find((sc) => sc.id === s.id && (sc.quelle === 'eigen') === istEigen);
+      if (gefunden) {
+        if (istEigen) { gefunden.titel = neuerTitel; gefunden.vorlage_titel = neuerTitel; }
+        else { gefunden.instanz_titel = gespeicherterTitel; gefunden.titel = gespeicherterTitel ?? gefunden.vorlage_titel; }
+      }
+    }
 
-  const eigeneTitel = document.createElement('h4');
-  eigeneTitel.style.cssText = 'font-size:13px;font-weight:600;margin:0 0 6px;';
-  eigeneTitel.textContent = 'Eigene Phasen und Schritte';
-  const eigeneHinweis = document.createElement('p');
-  eigeneHinweis.style.cssText = 'font-size:12px;color:var(--muted);margin:0 0 14px;';
-  eigeneHinweis.textContent =
-    'Eigene Phasen und Schritte erscheinen nur in diesem Prozess und haben keine Vorlage.';
-  block.appendChild(eigeneTitel);
-  block.appendChild(eigeneHinweis);
-
-  // Bestehende eigene Phasen/Schritte anzeigen
-  api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`).then((eigene) => {
-    if (eigene.length === 0) return;
-
-    // Nach Phase gruppieren
-    const phasenMap = new Map();
-    eigene.forEach((s) => {
-      if (!phasenMap.has(s.phase_name)) phasenMap.set(s.phase_name, []);
-      phasenMap.get(s.phase_name).push(s);
+    titelFeld.addEventListener('blur', speichereTitel);
+    titelFeld.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); titelFeld.blur(); }
     });
 
-    phasenMap.forEach((schritte, phaseName) => {
-      let aktFarbe = schritte[0].phase_farbe;
-
-      // Phase-Block mit Kopf (Name + Farbe editierbar) und Schritt-Liste
-      const phaseBlock = document.createElement('div');
-      phaseBlock.className = 'phasen-block';
-      phaseBlock.style.setProperty('--phase-farbe', aktFarbe);
-      phaseBlock.style.marginBottom = '10px';
-
-      // Kopf
-      const kopf = document.createElement('div');
-      kopf.className = 'phasen-kopf';
-
-      // Farb-Button mit Popup
-      const farbBtn = document.createElement('button');
-      farbBtn.type = 'button';
-      farbBtn.style.cssText = `background:${aktFarbe};width:22px;height:22px;border-radius:4px;border:2px solid rgba(0,0,0,.15);cursor:pointer;flex-shrink:0;`;
-      const farbPopup = document.createElement('div');
-      farbPopup.className = 'farb-popup';
-      farbPopup.style.display = 'none';
-      farbPopup.appendChild(renderFarbwahl(aktFarbe, async (f) => {
-        aktFarbe = f;
-        farbBtn.style.background = f;
-        phaseBlock.style.setProperty('--phase-farbe', f);
-        // Farbe aller Schritte dieser Phase aktualisieren
-        for (const s of schritte) {
-          await api(`/api/instanz-schritte/${s.id}`, {
-            method: 'PATCH', body: { phase_farbe: f }
-          });
-        }
-      }));
-      farbBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        farbPopup.style.display = farbPopup.style.display === 'none' ? 'block' : 'none';
-      });
-      document.addEventListener('click', () => { farbPopup.style.display = 'none'; });
-      const farbWrap = document.createElement('div');
-      farbWrap.style.position = 'relative';
-      farbWrap.appendChild(farbBtn);
-      farbWrap.appendChild(farbPopup);
-
-      // Name-Feld
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.className = 'phasen-name-feld';
-      nameInput.value = phaseName;
-      nameInput.style.color = aktFarbe;
-      nameInput.addEventListener('change', async () => {
-        const neuerName = nameInput.value.trim();
-        if (!neuerName || neuerName === phaseName) return;
-        for (const s of schritte) {
-          await api(`/api/instanz-schritte/${s.id}`, {
-            method: 'PATCH', body: { phase_name: neuerName }
-          });
-        }
-        render();
-      });
-
-      kopf.appendChild(farbWrap);
-      kopf.appendChild(nameInput);
-      phaseBlock.appendChild(kopf);
-
-      // Schritte der Phase
-      const schrittListe = document.createElement('div');
-      schrittListe.className = 'vorlagen-liste';
-      schrittListe.addEventListener('dragover', (e) => { if (ziehSchrittId != null) e.preventDefault(); });
-      schrittListe.addEventListener('drop', (e) => {
-        if (ziehSchrittId == null) return;
-        e.preventDefault();
-        const zielEl = e.target.closest('[data-schritt-id]');
-        const zielSchrittId = zielEl ? Number(zielEl.dataset.schrittId) : null;
-        const zi = zielIndexAusDrop(ziehSchrittId, phaseName, zielSchrittId);
-        const id = ziehSchrittId;
-        ziehSchrittId = null;
-        schrittVerschieben(id, phaseName, zi);
-      });
-      schritte.forEach((s) => {
-        const zeile = document.createElement('div');
-        zeile.className = 'vorlagen-zeile-wrapper';
-        zeile.dataset.schrittId = s.id;
-        zeile.innerHTML = `
-          <div class="vorlagen-zeile">
-            <span class="zieh-griff" draggable="true" title="Ziehen zum Umsortieren">⠿</span>
-            <input type="text" class="vorlagen-titel-feld"
-                   value="${s.titel.replace(/"/g, '&quot;')}">
-            <button class="btn-sekundaer btn btn-gefahr"
-                    style="width:auto;font-size:11px;padding:3px 8px;"
-                    title="Diesen Schritt endgültig löschen">🗑</button>
-          </div>`;
-        zeile.querySelector('.zieh-griff').addEventListener('dragstart', (e) => {
-          ziehSchrittId = s.id; zeile.classList.add('wird-gezogen'); e.dataTransfer.effectAllowed = 'move';
-        });
-        zeile.querySelector('.zieh-griff').addEventListener('dragend', () => {
-          zeile.classList.remove('wird-gezogen'); ziehSchrittId = null;
-        });
-        const stateSchritt = STATE.schritte.find((x) => x.id === s.id && x.quelle === 'eigen');
-        if (stateSchritt) {
-          const zeileDiv = zeile.querySelector('.vorlagen-zeile');
-          zeileDiv.appendChild(renderPfeilSchalter(stateSchritt));
-          zeileDiv.appendChild(renderPhasenZielAuswahl(stateSchritt));
-        }
-        zeile.querySelector('.vorlagen-titel-feld').addEventListener('change', async (e) => {
-          await api(`/api/instanz-schritte/${s.id}`, {
-            method: 'PATCH', body: { titel: e.target.value.trim() }
-          });
-        });
-        zeile.querySelector('.btn-gefahr').addEventListener('click', async () => {
-          if (!confirm(`Schritt „${s.titel}" löschen?`)) return;
-          await api(`/api/instanz-schritte/${s.id}`, { method: 'DELETE' });
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          render();
-        });
-        schrittListe.appendChild(zeile);
-      });
-      phaseBlock.appendChild(schrittListe);
-
-      // Neuen Schritt zu dieser bestehenden Phase hinzufügen
-      const addReihe = document.createElement('div');
-      addReihe.style.cssText = 'display:flex;gap:8px;margin:6px 8px 10px;';
-      const addInput = document.createElement('input');
-      addInput.type = 'text';
-      addInput.placeholder = 'Weiterer Schritt...';
-      addInput.style.cssText = 'flex:1;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;';
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'btn';
-      addBtn.style.cssText = 'width:auto;';
-      addBtn.textContent = '+';
-      const doAddSchritt = async () => {
-        const titel = addInput.value.trim();
-        if (!titel) return;
-        addBtn.disabled = true;
+    if (!istEigen) {
+      zeile.querySelector('[data-dup]').addEventListener('click', async () => {
+        const neuerTitel = prompt(`Titel der Kopie:\n(leer für "${origTitel} (Kopie)")`) ?? '';
+        if (neuerTitel === null) return;
         try {
-          await api(`/api/prozesse/${STATE.prozessId}/instanz-schritte`, {
+          await api(`/api/schritte/${s.id}/duplizieren`, {
             method: 'POST',
-            body: { titel, phase_name: phaseName, phase_farbe: aktFarbe }
+            body: {
+              titel: neuerTitel,
+              ziel_prozess_id: STATE.prozessId,
+              ziel_phase_id: gruppenPhaseId ?? s.phase_id,
+            },
           });
-          const res = await api(`/api/schritte?prozess_id=${STATE.prozessId}`);
-          STATE.schritte = res.schritte;
-          render();
-        } catch (err) {
-          alert('Fehler: ' + err.message);
-          addBtn.disabled = false;
-        }
-      };
-      addBtn.addEventListener('click', doAddSchritt);
-      addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doAddSchritt(); } });
-      addReihe.appendChild(addInput);
-      addReihe.appendChild(addBtn);
-      phaseBlock.appendChild(addReihe);
+          await schritteReload();
+        } catch (err) { alert('Fehler: ' + err.message); }
+      });
+    }
 
-      block.insertBefore(phaseBlock, neuePhaseBlock);
+    const loeschBtnZeile = zeile.querySelector('[data-loeschen]');
+    if (loeschBtnZeile) {
+      loeschBtnZeile.addEventListener('click', async () => {
+        if (!confirm(`Schritt „${anzeigetitel}" endgültig löschen?\n\nKann nicht rückgängig gemacht werden.`)) return;
+        try {
+          await api(istEigen ? `/api/instanz-schritte/${s.id}` : `/api/schritte/${s.id}`, { method: 'DELETE' });
+          await schritteReload();
+        } catch (err) {
+          alert('Fehler beim Löschen: ' + err.message);
+        }
+      });
+    }
+
+    zeile.querySelector('[data-toggle-deakt]').addEventListener('click', async () => {
+      try {
+        await api(istEigen ? `/api/instanz-schritte/${s.id}` : `/api/schritte/${s.id}`, {
+          method: 'PATCH', body: { deaktiviert: s.deaktiviert ? 0 : 1 }
+        });
+        await schritteReload();
+      } catch (err) {
+        alert('Fehler: ' + err.message);
+      }
     });
-  });
+
+    return zeile;
+  }
+
+  function renderAllePhasen() {
+    liste.innerHTML = '';
+    const alleAktuell = STATE.schritteAlle || STATE.schritte;
+    if (alleAktuell.length === 0) {
+      liste.innerHTML = '<p style="font-size:12px;color:var(--muted);">Noch keine Schritte vorhanden.</p>';
+      return;
+    }
+    for (const gruppe of gruppiereNachPhase(alleAktuell)) {
+      liste.appendChild(renderPhasenBlockVerwaltung(gruppe));
+    }
+  }
+
+  renderAllePhasen();
 
   // Neue Phase + Schritte anlegen
   const neuePhaseBlock = document.createElement('div');
@@ -2515,29 +2290,6 @@ function renderInstanzSchrittVerwaltung() {
   neuePhaseBlock.appendChild(speichernBtn);
 
   return block;
-}
-
-/**
- * Aktualisiert Phasenfarbe und/oder -name direkt im DOM ohne Seitensprung.
- * Sucht alle Elemente mit data-phase-name und aktualisiert sie.
- */
-function aktualisierePhaseImDOM(phaseName, neueFarbe, neuerName) {
-  // Phase-Titel in der Checkliste aktualisieren
-  document.querySelectorAll('.phase-title').forEach((el) => {
-    if (el.textContent.includes(phaseName.replace(/^\d+\.\s*/, ''))) {
-      if (neueFarbe) el.style.color = neueFarbe;
-      if (neuerName) el.textContent = el.textContent.replace(
-        phaseName.replace(/^\d+\.\s*/, ''), neuerName
-      );
-    }
-  });
-  // Schritt-Akzentfarben aktualisieren
-  if (neueFarbe) {
-    document.querySelectorAll('.schritt').forEach((el) => {
-      const phase = el.dataset.phase;
-      if (phase === phaseName) el.style.setProperty('--accent', neueFarbe);
-    });
-  }
 }
 
 async function ladeProzessSchritteMitDeaktivierten(prozessId) {

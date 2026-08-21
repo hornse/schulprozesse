@@ -316,3 +316,58 @@ Funktion, nur die Zieh-Geste selbst bleibt Maus-only.
 **Entscheidung:** So ausgeliefert. Eine echte Touch-Zieh-Geste bleibt
 offen für einen späteren, eigenen Auftrag, falls sich das als tatsächliches
 Bedürfnis herausstellt.
+
+---
+
+## E10 — "Prozesse verwalten" gruppiert nach angezeigter Phase, nicht nach Schritt-Herkunft (22.08.2026)
+
+**Anlass:** Unmittelbar nach Auslieferung von E5–E9 gemeldet: Wurde ein
+eigener Schritt in eine Vorlage-Phase verschoben, erschien eine zweite,
+scheinbar neue Phase mit demselben Namen statt sich der bestehenden Phase
+anzuschließen – der verschobene Schritt blieb dadurch von den übrigen
+Schritten seiner Phase getrennt.
+
+**Ursache:** `renderInstanzSchrittVerwaltung()` (Verwaltungsseite
+„Prozesse verwalten") baute Vorlage- und eigene Schritte in zwei strikt nach
+`s.quelle` getrennten Abschnitten auf – eine Aufteilung, die so lange
+unproblematisch war, wie ein Schritt seine Herkunft nie wechseln konnte.
+E6 hat genau das ermöglicht (`instanz_phase_name`/`-farbe`), ohne dass die
+Darstellung in „Prozesse verwalten" mitgezogen wurde – die drei anderen
+Ansichten (Checkliste, Zeitstrahl, Gantt) gruppieren dagegen schon seit dem
+Fund vom 21.08.2026 über `gruppiereNachPhase()` rein nach dem angezeigten
+Phasennamen und waren von diesem Fehler nicht betroffen.
+
+**Entscheidung:** „Prozesse verwalten" gruppiert jetzt ebenfalls über
+`gruppiereNachPhase()`, in einem einzigen Durchlauf über beide Herkünfte
+gemeinsam. Eine Phasengruppe gilt als „echte" Vorlage-Phase, sobald
+*irgendein* ihrer aktuellen Mitglieder eine `phase_id` trägt (nicht mehr:
+sobald die *zuerst* einsortierte Zeile Vorlage-Herkunft hat) – das war schon
+vor diesem Fund die robustere, aber ungenutzte Variante.
+
+**Folgeentscheidung – Umbenennen/Umfärben nimmt abgekoppelte Mitglieder mit:**
+Eine Phase umzubenennen betraf bisher nur Schritte derselben Herkunft wie
+die Phase selbst. Jetzt läuft der Kern weiter über `instanz_phasen` (damit
+nicht verschobene Vorlage-Schritte automatisch künftigen Umbenennungen
+folgen), zusätzlich werden aber alle bereits „abgekoppelten" Mitglieder
+(verschobene Vorlage-Schritte, alle eigenen Schritte – erkennbar an
+fehlender `phase_id`) explizit über den Reihenfolge-Endpunkt mitgenommen.
+Ohne das bliebe ein verschobener Schritt bei jeder weiteren Umbenennung
+seiner neuen Phase wieder zurück.
+
+**Folgeentscheidung – "🗑 Phase" löscht keine Vorlage-Schritte mehr:**
+Enthält eine rein eigene Phase durch eine Verschiebung jetzt auch
+Vorlage-Schritte, würde ein pauschales Löschen aller Mitglieder Daten
+zerstören, die nicht diesem einen Prozess gehören (bzw. bei
+prozesseigenen Vorlage-Schritten zumindest nicht ohne Weiteres
+wiederherstellbar). Entscheidung: „🗑 Phase" löscht weiterhin nur die
+eigenen Schritte endgültig, hierher verschobene Vorlage-Schritte werden
+stattdessen nur deaktiviert (ausgeblendet, wiederherstellbar über
+„↩ reaktivieren" in ihrer neuen Phase) – mit entsprechendem Hinweis in der
+Rückfrage.
+
+**Nicht angefasst, bewusst offen gelassen:** „↺ Alles" setzt weiterhin nur
+Umbenennungen und Ausblendungen der *ursprünglichen* Vorlage-Phase zurück,
+nicht `instanz_phase_name`/`-farbe` – ein Schritt, der aus dieser Phase
+herausgezogen wurde, kehrt durch „↺ Alles" also nicht automatisch dorthin
+zurück. Ob das gewünscht ist, wurde nicht erfragt; hier nur als bekannte
+Lücke vermerkt, nicht als Entscheidung.

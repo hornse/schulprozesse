@@ -78,12 +78,16 @@ function handleLogin(PDO $db, array $config, array $input): void
     $rolle = findeBenutzerRolle($db, $result['username']);
 
     if ($rolle === null) {
+        // Nach aussen wie ein falsches Passwort: gleicher Wortlaut, gleicher
+        // Statuscode. Ein abweichender Fehlschlag verriete, dass das Passwort
+        // stimmte, und machte die Anwendung zum Pruefstand fuer fremde
+        // Zugangsdaten (FALLSTRICKE.md 8).
+        //
+        // Der tatsaechliche Grund steht im Protokoll, nicht in der Antwort:
+        // Wer nicht hineinkommt, meldet sich ohnehin bei einer Administratorin
+        // oder einem Administrator, und die lesen login_log.grund.
         protokolliereLoginVersuch($db, $result['username'], false, 'nicht_freigegeben', $ip);
-        Response::error(
-            'Diese App ist nur für freigegebene Personen (Untis/WebUntis-Team) nutzbar. '
-            . 'Bitte eine Admin/einen Admin um Freischaltung bitten.',
-            403
-        );
+        Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
     }
 
     protokolliereLoginVersuch($db, $result['username'], true, null, $ip);

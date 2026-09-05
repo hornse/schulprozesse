@@ -180,5 +180,39 @@ grep -q "config/config.php" .gitignore 2>/dev/null \
     && gruen "config.php ausgeschlossen" || rot "config.php nicht ausgeschlossen"
 
 echo ""
+echo "Anmeldung"
+# Der Fehlschlag des ZWEITEN Anmeldeschritts darf nicht anders aussehen als
+# ein falsches Passwort. Sonst unterscheidet ein Angreifer "Passwort falsch"
+# von "Passwort richtig, kein Datensatz", und die Anwendung wird zum
+# Pruefstand fuer fremde Zugangsdaten. FALLSTRICKE.md Abschnitt 8.
+#
+# Geprueft wird die FUNKTION, nicht die Datei: Eine Rechtepruefung an einer
+# bestehenden Sitzung DARF unterscheiden, dort war kein Passwort im Spiel.
+# Solche Stellen liegen ausserhalb von handleLogin und muessen gruen bleiben.
+#
+# Der Statuscode wird nicht zeilenweise gesucht. Er steht hier auf einer
+# eigenen Zeile, und ein zeilenweiser Ausdruck faende ihn nicht.
+AUTH=backend/api/auth.php
+RUMPF=$(awk '/^function handleLogin\(/ {f=1} f {print} f && /^\}/ {exit}' "$AUTH" 2>/dev/null | tr '\n' ' ')
+if [ -z "$RUMPF" ]; then
+    rot "Anmeldung: handleLogin() nicht gefunden – die Pruefung fand ihre Voraussetzung nicht"
+else
+    CODES=$(printf '%s' "$RUMPF" | awk '{
+        n = split($0, t, /Response::error\(/)
+        for (i = 2; i <= n; i++) {
+            u = t[i]; sub(/\);.*/, "", u)
+            if (match(u, /[0-9][0-9][0-9][ \t]*$/)) print substr(u, RSTART, 3)
+        }
+    }' | sort -u | tr '\n' ' ' | sed 's/ *$//')
+    if [ -z "$CODES" ]; then
+        rot "Anmeldung: kein Statuscode in handleLogin gefunden – prueft die Pruefung noch etwas?"
+    elif [ "$CODES" = "401" ]; then
+        gruen "Anmeldung lehnt einheitlich mit 401 ab"
+    else
+        rot "Anmeldung lehnt uneinheitlich ab (Statuscodes: $CODES)"
+    fi
+fi
+
+echo ""
 if [ "$FEHLER" -eq 0 ]; then echo "ALLES GRÜN"; exit 0; fi
 echo "$FEHLER FEHLER"; exit 1

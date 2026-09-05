@@ -6,6 +6,8 @@ Diese Datei gibt Claude (und anderen KI-Assistenten) sofortigen Kontext
 
 Ergänzend:
 - Entscheidungen mit Begründung, chronologisch: @docs/ENTSCHEIDUNGEN.md
+- Regeln der Reihe: @REIHENREGELN.md
+- Fallstricke PHP/Router/WebUntis: @FALLSTRICKE.md
 
 ---
 

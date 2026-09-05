@@ -104,11 +104,7 @@ schulprozesse/
 $pdo = new PDO('sqlite:' . $config['db']['sqlite_path']);
 ```
 
-Alle SQL-Syntax muss SQLite-kompatibel sein:
-- Kein `AUTO_INCREMENT` → `INTEGER PRIMARY KEY` (SQLite-Autoincrement)
-- Kein `ENGINE=InnoDB` / `CHARSET=utf8mb4`
-- Kein `NOW()` → `datetime('now')`
-- Kein `DATE_SUB()` → `datetime('now', '-15 minutes')`
+Die Datei liegt unter `data/app.sqlite` und steht nicht in git.
 
 ---
 
@@ -120,8 +116,6 @@ Alle SQL-Syntax muss SQLite-kompatibel sein:
 | `school` | `frg-dusseldorf` |
 | `client` | `SchuljahreswechselApp` |
 | `allowed_person_types` | `[2, 16]` (kein Schüler-Login) |
-| personType 2 | Lehrkraft |
-| personType 16 | WebUntis-Admin, personId = **-1** |
 
 **Kein lokaler E-Mail/Passwort-Login** – nur WebUntis.
 
@@ -160,17 +154,9 @@ ohne DB-Eintrag. Alle User sind in der DB.
 
 ---
 
-## Kritische Regeln (IMMER beachten)
+## Die eigenen Werte
 
-### 1. SQLite-Syntax verwenden
-```sql
--- ✗ FALSCH (MariaDB)
-INSERT INTO log (zeitpunkt) VALUES (NOW());
--- ✓ RICHTIG (SQLite)
-INSERT INTO log (zeitpunkt) VALUES (datetime('now'));
-```
-
-### 2. Session-Name ist 'swj_session'
+### Der Sitzungsname ist `swj_session`
 ```php
 // In config/config.php:
 'session' => [
@@ -179,19 +165,16 @@ INSERT INTO log (zeitpunkt) VALUES (datetime('now'));
 ],
 ```
 
-### 3. CSRF-Schutz per X-Requested-With Header
+### CSRF-Schutz per `X-Requested-With`
 Alle schreibenden Requests müssen diesen Header enthalten:
 ```
 X-Requested-With: SchuljahreswechselApp
 ```
 Frontend schickt ihn automatisch mit. Bei direkten curl-Tests explizit setzen.
 
-### 4. WebUntis JSESSIONID-Cookie
-Nach `authenticate` den Cookie aus `Set-Cookie` speichern und bei
-Folgeaufrufen mitschicken. → In `WebUntisAuth.php` implementiert.
-
-### 5. WebUntis-Admin (personType 16) hat personId = -1
-Kein Eintrag in `getTeachers()`. Name aus DB per Kürzel nachschlagen.
+### Wo der JSESSIONID-Cookie gehalten wird
+In `backend/src/Auth/WebUntisAuth.php` — dort wird er aus `Set-Cookie`
+gelesen und für die Folgeaufrufe behalten.
 
 ---
 
@@ -222,65 +205,41 @@ Grund: `backend/public/` ist hier der Docroot, `frontend/` gibt es nicht
 (siehe `docs/ENTSCHEIDUNGEN.md`, E1). Stand: siehe Kopfvermerk in
 `backend/public/vendor/ci-css/ci-tokens.css`.
 
-**Vendored heißt kopiert, nicht abgetippt.** Änderungen am Modul gehören
-ins Modul-Repo `hornse/ci-css` und werden von dort zurückkopiert, nie
-umgekehrt. Jede vendorte Datei trägt einen Kopfvermerk der Form
-`VENDORED aus hornse/ci-css vX.Y.Z – dort ändern, hierher kopieren!`.
-
-**Kein Farbwert außerhalb von `ci-tokens.css`** – mit einer Ausnahme:
-projekteigene Kategorienpaletten, die nur dieses Projekt braucht (Rollen-
-und Sichtbarkeitsmarken für öffentlich/privat/verantwortlich/mitarbeitend),
+**Die Farbwert-Ausnahme wird hier in Anspruch genommen:** Rollen- und
+Sichtbarkeitsmarken für öffentlich/privat/verantwortlich/mitarbeitend
 stehen im `:root`-Block von `style.css`, mit Kommentar zum Kontrast.
 Begründung: `docs/ENTSCHEIDUNGEN.md`, E2. `tests-schulprozesse.sh` prüft
-entsprechend nur „außerhalb des `:root`-Blocks", nicht „außerhalb von
+deshalb nur „außerhalb des `:root`-Blocks", nicht „außerhalb von
 `ci-tokens.css`".
 
-**Keine erfundenen Modulklassennamen.** Ein geratener `ci-`Klassenname
-sieht richtig aus und hat einfach keine Regel – in `fachkonferenzen`
-verschwanden dadurch einmal alle Karten. `tests-schulprozesse.sh` prüft
-deshalb im Abschnitt „Gerüst" für jede von `app.js` gesetzte Klasse, ob
-eine CSS-Regel existiert, mit einer benannten Ausnahmeliste für bekannte
-Altlasten (`docs/ENTSCHEIDUNGEN.md`, E4).
+**Wie hier auf erfundene Klassennamen geprüft wird:**
+`tests-schulprozesse.sh` sieht im Abschnitt „Gerüst" für jede von
+`app.js` gesetzte Klasse nach, ob eine CSS-Regel existiert — mit einer
+benannten Ausnahmeliste für bekannte Altlasten
+(`docs/ENTSCHEIDUNGEN.md`, E4).
 
 ---
 
-## Regeln der Reihe
+## Der Zustand der eigenen Skripte
 
-Gelten projektübergreifend für alle Anwendungen der Reihe (sprechtag,
-fachkonferenzen, projektstunden, schulprozesse, signage, lernzeiten):
+`tests-schulprozesse.sh` setzt `export LC_ALL=C` in Zeile 10. Es läuft
+ohne `-e` (nur `set -uo pipefail`); `deploy.sh` läuft mit `set -e`, aber
+ohne `grep`.
 
-- **`export LC_ALL=C`** in jedem Shell-Skript mit Zahlenvergleichen.
-  `tests-schulprozesse.sh` setzt es bereits (Zeile 10) – ohne das kann ein
-  Zahlenvergleich je nach Locale unterschiedlich ausfallen.
-- **`grep` mit Exit-Code 1 unter `set -e`** bricht ein Skript ab, auch wenn
-  kein Treffer der Erfolgsfall ist. `tests-schulprozesse.sh` läuft bisher
-  ohne `-e` (nur `set -uo pipefail`), `deploy.sh` mit `set -e`, aber ohne
-  `grep`. Kommt künftig `grep` in ein `set -e`-Skript, braucht ein
-  erwarteter Nulltreffer ein `|| true` – aber nur für den echten
-  Erfolgsfall, nie pauschal für einen Werkzeugfehler.
-- **Jede neue Prüfung braucht eine Gegenprobe.** Den Fehlerfall künstlich
-  herstellen, die Prüfung muss anschlagen – sonst weiß niemand, ob sie
-  überhaupt etwas prüft. So entstand die Prüfung „Gruppierung" in
-  `tests-schulprozesse.sh` (20.08.2026): erst gegen die ungruppierte,
-  fehlerhafte Fassung von `gruppiereNachPhase()` laufen gelassen (rot),
-  erst danach gegen die reparierte (grün).
-- **Wird eine Prüfung erweitert, muss die Prüfungszahl um den erwarteten
-  Betrag steigen.** Bleibt sie gleich oder steigt um weniger, ist die
-  Erweiterung nicht wirksam geworden.
-- **`deploy.sh` muss den Push auch dann erreichen, wenn es nichts zu
-  committen gibt.** Muster: `git add -A`, dann
-  `if ! git diff --cached --quiet; then git commit …`. `deploy.sh` hat das
-  seit dem 17.08.2026 (Commit `753709a`) – Anlass war ein
-  Cache-Busting-Ausdruck, der nur Ziffern erfasste und das `?v=DEV` im
-  Auslieferungszustand nicht traf: das `sed` lief ins Leere, es gab nichts
-  zu committen, und unter `set -e` brach der Commit-Schritt vor dem Push
-  ab.
+`deploy.sh` erreicht den Push auch dann, wenn es nichts zu committen
+gibt — seit dem 17.08.2026, Commit `753709a`. Anlass war ein
+Cache-Busting-Ausdruck, der nur Ziffern erfasste und das `?v=DEV` im
+Auslieferungszustand nicht traf: Das `sed` lief ins Leere, es gab nichts
+zu committen, und unter `set -e` brach der Commit-Schritt vor dem Push
+ab.
+
+Die Prüfung „Gruppierung" entstand am 20.08.2026 gegen die ungruppierte,
+fehlerhafte Fassung von `gruppiereNachPhase()` — erst rot, dann gegen die
+reparierte grün.
 
 ---
 
 ## Vor jeder Auslieferung wirklich prüfen
-
-Nicht behaupten, sondern ausführen:
 
 ```bash
 ./tests-schulprozesse.sh

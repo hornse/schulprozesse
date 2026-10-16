@@ -63,6 +63,20 @@ else
 fi
 
 echo ""
+echo "Anmeldebremse (tests/anmeldebremse_test.php, ausgeführt gegen SQLite)"
+# PHP ist keine Kür: Die Anwendung ist PHP. Fehlt es, ist die Prüfung rot,
+# nicht übersprungen. Die Zeilen der Suite stehen einzeln in der Ausgabe,
+# damit ihre Zahl sichtbar ist.
+if ! command -v php > /dev/null 2>&1; then
+    rot "Anmeldebremse: php fehlt – die Suite lief nicht"
+elif BREMSE_AUS=$(php tests/anmeldebremse_test.php 2>/dev/null); then
+    printf '%s\n' "$BREMSE_AUS" | grep -E '^  ✓ '
+else
+    printf '%s\n' "$BREMSE_AUS" | grep -E '^  (✓|✗) '
+    rot "Anmeldebremse: Suite rot (php tests/anmeldebremse_test.php)"
+fi
+
+echo ""
 echo "Datenschutz"
 # Kommentare vorher entfernen: Die Erklärung, warum der @import weg ist,
 # darf nicht als Fund gelten.

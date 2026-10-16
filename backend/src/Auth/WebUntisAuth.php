@@ -38,10 +38,12 @@ use RuntimeException;
  *   2. Keine Passwort-Logs: Das MRBS-Modul kann im Debug-Modus den
  *      kompletten Request-Body (inkl. Klartext-Passwort) protokollieren.
  *      Diese Klasse loggt nie den Request-Body.
- *   3. Timeouts + einfache Brute-Force-Bremse, damit ein langsames oder
- *      kompromittiertes WebUntis nicht den ganzen PHP-Prozess blockiert
- *      bzw. nicht für automatisiertes Passwort-Raten missbraucht werden
- *      kann.
+ *   3. Timeouts, damit ein langsames oder kompromittiertes WebUntis nicht
+ *      den ganzen PHP-Prozess blockiert. Die Bremse gegen Passwort-Raten
+ *      steht seit Oktober 2026 in Anmeldebremse und wird in handleLogin
+ *      gefragt – vor dem Notfallpasswort und vor dieser Klasse. Diese
+ *      Klasse schreibt nichts mehr in login_log; sie meldet über grund(),
+ *      warum sie null lieferte.
  *
  * Die WebUntis-Session (sessionId), die `authenticate` zurückgibt, wird
  * NICHT weiterverwendet - wir brauchen sie nur als Nachweis, dass das
@@ -55,6 +57,9 @@ final class WebUntisAuth
      *                       config.php), nicht nur der 'webuntis'-Teil -
      *                       wir brauchen zusätzlich 'security'.
      */
+    /** Warum der letzte authenticate()-Aufruf null lieferte; null nach Erfolg. */
+    private ?string $grund = null;
+
     public function __construct(
         private readonly array $config,
         private readonly PDO $db,
@@ -62,23 +67,31 @@ final class WebUntisAuth
     }
 
     /**
+     * Der Grund des letzten Fehlschlags: 'falsches_passwort' (WebUntis hat
+     * abgelehnt), 'falsche_rolle' (Passwort stimmte, Kontotyp nicht erlaubt),
+     * 'ohne_entscheid' (WebUntis antwortete nicht – kein Passwort hat
+     * entschieden, zählt nicht für die Bremse), 'leer'.
+     */
+    public function grund(): ?string
+    {
+        return $this->grund;
+    }
+
+    /**
      * Versucht, den Benutzer gegen WebUntis zu authentifizieren.
      *
      * @return array{username: string, personType: int, personId: int}|null
-     *         null bei falschem Passwort, falscher Rolle oder Netzwerkfehler.
-     *         Der Aufrufer (siehe backend/api/auth.php) entscheidet, was er
-     *         daraus für eine Fehlermeldung macht.
+     *         null bei falschem Passwort, falscher Rolle oder Netzwerkfehler –
+     *         welches davon, sagt grund(). Der Aufrufer (backend/api/auth.php)
+     *         entscheidet über Meldung und Bremse.
      */
-    public function authenticate(string $username, string $password, string $ip): ?array
+    public function authenticate(string $username, string $password): ?array
     {
         $username = trim($username);
+        $this->grund = null;
 
         if ($username === '' || $password === '') {
-            return null;
-        }
-
-        if ($this->tooManyAttempts($username)) {
-            $this->logAttempt($username, false, 'zu_viele_versuche', $ip);
+            $this->grund = 'leer';
             return null;
         }
 
@@ -88,9 +101,14 @@ final class WebUntisAuth
             'client'   => $this->config['webuntis']['client'],
         ]);
 
-        // Netzwerkfehler oder JSON-RPC-Fehlerantwort (falsches Passwort).
-        if ($response === null || isset($response['error'])) {
-            $this->logAttempt($username, false, 'falsches_passwort_oder_netzwerk', $ip);
+        // Netzwerkfehler: WebUntis antwortete nicht, kein Passwort hat entschieden.
+        if ($response === null) {
+            $this->grund = 'ohne_entscheid';
+            return null;
+        }
+        // JSON-RPC-Fehlerantwort (falsches Passwort).
+        if (isset($response['error'])) {
+            $this->grund = 'falsches_passwort';
             return null;
         }
 
@@ -103,11 +121,9 @@ final class WebUntisAuth
         $this->callJsonRpc('logout', []);
 
         if (!in_array($personType, $this->config['webuntis']['allowed_person_types'], true)) {
-            $this->logAttempt($username, false, 'falsche_rolle', $ip);
+            $this->grund = 'falsche_rolle';
             return null;
         }
-
-        $this->logAttempt($username, true, null, $ip);
 
         return [
             'username'   => $username,
@@ -179,44 +195,5 @@ final class WebUntisAuth
         }
 
         return $decoded;
-    }
-
-    /**
-     * Einfache Brute-Force-Bremse auf Basis von login_log: blockt einen
-     * Benutzernamen kurzfristig, wenn zu viele Fehlversuche aufgelaufen sind.
-     * Das schützt zugleich WebUntis selbst vor automatisiertem Passwort-Raten
-     * über diese App.
-     */
-    private function tooManyAttempts(string $username): bool
-    {
-        $maxAttempts = $this->config['security']['max_failed_logins'] ?? 5;
-        $lockoutMinutes = $this->config['security']['lockout_minutes'] ?? 15;
-
-        $stmt = $this->db->prepare(
-            "SELECT COUNT(*) FROM login_log
-             WHERE webuntis_user = :user
-               AND erfolgreich = 0
-               AND zeitpunkt >= datetime('now', :window)"
-        );
-        $stmt->execute([
-            ':user'   => $username,
-            ':window' => '-' . $lockoutMinutes . ' minutes',
-        ]);
-
-        return (int) $stmt->fetchColumn() >= $maxAttempts;
-    }
-
-    private function logAttempt(string $username, bool $success, ?string $grund, string $ip): void
-    {
-        $stmt = $this->db->prepare(
-            'INSERT INTO login_log (webuntis_user, erfolgreich, grund, ip)
-             VALUES (:user, :erfolgreich, :grund, :ip)'
-        );
-        $stmt->execute([
-            ':user'       => $username,
-            ':erfolgreich' => $success ? 1 : 0,
-            ':grund'      => $grund,
-            ':ip'         => $ip,
-        ]);
     }
 }

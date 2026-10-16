@@ -22,6 +22,11 @@
  * Endpunkte: POST /api/login, POST /api/logout, GET /api/me
  *
  * Login-Reihenfolge:
+ *   0. Die Anmeldebremse (App\Auth\Anmeldebremse): den Versuch eintragen,
+ *      dann zählen. Ab der Schwelle eine Minute Wartezeit (429), scheitert
+ *      die Zählung 503. VOR dem Notfallpasswort: Ein ungebremstes Passwort
+ *      lässt sich in Ruhe durchprobieren, und der Notfallzugang ist der
+ *      mächtigste (Entscheidung Betreiber, 16.10.2026).
  *   1. Ist die Person in benutzer_rollen und hat einen passwort_hash?
  *      → Lokales Passwort prüfen (bcrypt). Bei Erfolg: einloggen ohne
  *        WebUntis-Request. Bei Misserfolg: trotzdem weiter zu Schritt 2.
@@ -30,9 +35,10 @@
  *
  * Das lokale Passwort wird NUR per SQL gesetzt, kein UI – es ist ein
  * Notfall-Mechanismus für den Fall dass WebUntis nicht erreichbar ist.
- * Siehe migrations/008_lokales_passwort.sql für die genauen Befehle.
+ * Die Befehle stehen in docs/INSTALL.md, Abschnitt „Notfall-Passwort“.
  */
 
+use App\Auth\Anmeldebremse;
 use App\Auth\WebUntisAuth;
 use App\Guard;
 use App\Response;
@@ -44,17 +50,28 @@ function handleLogin(PDO $db, array $config, array $input): void
     $password = (string) ($input['password'] ?? '');
     $ip       = $_SERVER['REMOTE_ADDR'] ?? 'unbekannt';
 
+    if (trim($username) === '' || $password === '') {
+        Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
+    }
+
+    // --- Schritt 0: Bremse – vor jedem Passwort ---
+    $versuch = bremseBeginnen($db, $config, trim($username), $ip);
+
     // --- Schritt 1: Lokales Passwort prüfen ---
     $lokalStmt = $db->prepare(
         'SELECT anzeigename, rolle, passwort_hash FROM benutzer_rollen WHERE webuntis_user = :u'
     );
     $lokalStmt->execute([':u' => $username]);
     $lokalZeile = $lokalStmt->fetch();
+    // Ein falsches Notfallpasswort IST ein Entscheid – auch wenn WebUntis
+    // danach nicht antwortet. Sonst wäre das Notfallpasswort genau im Notfall
+    // wieder ungebremst.
+    $lokalFalsch = false;
 
     if ($lokalZeile && !empty($lokalZeile['passwort_hash'])) {
         if (password_verify($password, $lokalZeile['passwort_hash'])) {
-            // Lokaler Login erfolgreich
-            protokolliereLoginVersuch($db, $username, true, 'lokal', $ip);
+            // Lokaler Login erfolgreich – setzt die Bremse zurück
+            Anmeldebremse::abschliessen($db, $versuch, true, 'lokal');
             $user = [
                 'webuntis_user' => $username,
                 'anzeigename'   => $lokalZeile['anzeigename'] ?: $username,
@@ -64,13 +81,24 @@ function handleLogin(PDO $db, array $config, array $input): void
             Response::json($user);
         }
         // Lokales Passwort falsch – weiter mit WebUntis-Prüfung
+        $lokalFalsch = true;
     }
 
     // --- Schritt 2: WebUntis-Authentifizierung ---
     $auth   = new WebUntisAuth($config, $db);
-    $result = $auth->authenticate($username, $password, $ip);
+    $result = $auth->authenticate($username, $password);
 
     if ($result === null) {
+        // Antwortete WebUntis nicht, hat kein Passwort entschieden und der
+        // Versuch zählt nicht – es sei denn, das Notfallpasswort war falsch.
+        // Die Antwort bleibt in jedem Fall dieselbe.
+        if ($auth->grund() === 'ohne_entscheid' && $lokalFalsch) {
+            Anmeldebremse::abschliessen($db, $versuch, false, 'falsches_lokales_passwort');
+        } elseif ($auth->grund() === 'ohne_entscheid') {
+            Anmeldebremse::ohneEntscheid($db, $versuch);
+        } else {
+            Anmeldebremse::abschliessen($db, $versuch, false, $auth->grund());
+        }
         Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
     }
 
@@ -86,11 +114,13 @@ function handleLogin(PDO $db, array $config, array $input): void
         // Der tatsaechliche Grund steht im Protokoll, nicht in der Antwort:
         // Wer nicht hineinkommt, meldet sich ohnehin bei einer Administratorin
         // oder einem Administrator, und die lesen login_log.grund.
-        protokolliereLoginVersuch($db, $result['username'], false, 'nicht_freigegeben', $ip);
+        // Er zählt für die Bremse wie ein falsches Passwort – sonst verriete
+        // das Ausbleiben der Wartezeit, dass das Passwort stimmte.
+        Anmeldebremse::abschliessen($db, $versuch, false, 'nicht_freigegeben');
         Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
     }
 
-    protokolliereLoginVersuch($db, $result['username'], true, null, $ip);
+    Anmeldebremse::abschliessen($db, $versuch, true, null);
 
     $user = [
         'webuntis_user' => $result['username'],
@@ -128,13 +158,24 @@ function findeBenutzerRolle(PDO $db, string $username): ?array
 }
 
 /**
- * Ergänzt login_log auch für den Fall "WebUntis-Login korrekt, aber
- * nicht freigegeben" - WebUntisAuth kennt diesen Grund nicht, weil die
- * Freigabe-Prüfung eine Ebene höher (hier) passiert.
+ * Fragt die Anmeldebremse (App\Auth\Anmeldebremse) und weist ab, wenn sie
+ * nein sagt – mit ihrem eigenen Status (429 warten, 503 Zählung gescheitert).
+ * Steht außerhalb von handleLogin, weil dort jede Ablehnung 401 ist, solange
+ * ein Passwort entschied; hier hat noch keines entschieden.
+ *
+ * Schwelle und Zählfenster aus config.php: security.max_failed_logins und
+ * security.lockout_minutes (heißt weiter so, ist jetzt das Zählfenster).
  */
-function protokolliereLoginVersuch(PDO $db, string $username, bool $erfolgreich, ?string $grund, string $ip): void
+function bremseBeginnen(PDO $db, array $config, string $username, string $ip): int
 {
-    $db->prepare(
-        'INSERT INTO login_log (webuntis_user, erfolgreich, grund, ip) VALUES (:u, :e, :g, :ip)'
-    )->execute([':u' => $username, ':e' => $erfolgreich ? 1 : 0, ':g' => $grund, ':ip' => $ip]);
+    $r = Anmeldebremse::beginnen(
+        $db, $username, $ip,
+        (int) ($config['security']['max_failed_logins'] ?? 5),
+        (int) ($config['security']['lockout_minutes'] ?? 15)
+    );
+    if (!$r['urteil']['durch']) {
+        if ($r['urteil']['status'] === 429) header('Retry-After: ' . Anmeldebremse::WARTEN_SEKUNDEN);
+        Response::error($r['urteil']['meldung'], $r['urteil']['status']);
+    }
+    return $r['id'];
 }

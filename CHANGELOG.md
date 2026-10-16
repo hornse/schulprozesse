@@ -7,6 +7,31 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Geändert
+- **Anmeldebremse: Wartezeit statt Sperre** (Auftrag aus `koordination`,
+  `AUFTRAG-anmeldebremse-reihe.md`, 16.10.2026; Begründung in
+  `docs/ENTSCHEIDUNGEN.md`, E11). Vorher sperrte `WebUntisAuth` nach 5
+  Fehlversuchen 15 Minuten lang – auch den Inhaber mit dem richtigen
+  Passwort; jeder abgewiesene Versuch verlängerte die Sperre; ein Netzfehler
+  zählte wie ein falsches Passwort; das **Notfallpasswort wurde vor der
+  Bremse geprüft und war gar nicht gebremst.** Jetzt, in
+  `backend/src/Auth/Anmeldebremse.php` an einer Stelle:
+  ab 5 Fehlversuchen eine Minute Wartezeit (429, die Meldung nennt die
+  Sekunden); zuerst eintragen, dann zählen; abgewiesene zählen nicht; eine
+  gelungene Anmeldung setzt zurück (nach der Kennung); WebUntis nicht
+  erreichbar zählt nicht – außer das Notfallpasswort war falsch; die Zählung
+  scheitert geschlossen mit 503 und eigenem Satz. `WebUntisAuth` schreibt
+  nicht mehr selbst in `login_log`. Keine Migration.
+- **Prüfungen:** `tests/anmeldebremse_test.php` neu (31), eingebunden in
+  `tests-schulprozesse.sh`: ✓-Zeilen 40 → 71. Ausgeführt gegen SQLite mit
+  der Tabelle aus `migrations/001_init.sql`, `handleLogin` selbst mit einem
+  nicht erreichbaren WebUntis. `tests/mutationen_anmeldebremse.sh` neu:
+  20 Mutationen, alle angeschlagen.
+- **Abnahme (nicht offline messbar):** Testkonto, falsches Passwort im
+  eigenen Tempo – der sechste Versuch zeigt die Sekunden; nach der Minute
+  geht das richtige Passwort durch; abmelden, einmal falsch, dann richtig –
+  durch ohne Wartezeit.
+
 ### Hinzugefügt
 - **Schritte per Drag-and-drop verschieben** ("Prozesse verwalten") – sowohl
   innerhalb einer Phase umsortieren als auch phasenübergreifend verschieben,

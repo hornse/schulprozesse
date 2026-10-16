@@ -52,9 +52,11 @@ return [
         'lifetime_minutes' => 480, // 8 Stunden
     ],
 
-    // Einfache Brute-Force-Bremse: ab dieser Anzahl Fehlversuche innerhalb
-    // von 15 Minuten wird ein Login für denselben Benutzernamen kurz gesperrt,
-    // BEVOR überhaupt eine Anfrage an WebUntis geschickt wird.
+    // Anmeldebremse (App\Auth\Anmeldebremse): ab dieser Anzahl Fehlversuche
+    // innerhalb des Fensters heißt es eine Minute warten – je Benutzername,
+    // vor dem Notfallpasswort und BEVOR eine Anfrage an WebUntis geht. Nie
+    // eine Sperre; eine gelungene Anmeldung setzt zurück. `lockout_minutes`
+    // heißt aus Verträglichkeit so und ist das Zählfenster.
     'security' => [
         'max_failed_logins' => 5,
         'lockout_minutes'   => 15,

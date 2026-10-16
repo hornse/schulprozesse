@@ -371,3 +371,55 @@ nicht `instanz_phase_name`/`-farbe` – ein Schritt, der aus dieser Phase
 herausgezogen wurde, kehrt durch „↺ Alles" also nicht automatisch dorthin
 zurück. Ob das gewünscht ist, wurde nicht erfragt; hier nur als bekannte
 Lücke vermerkt, nicht als Entscheidung.
+
+---
+
+## E11 — Anmeldebremse: Wartezeit statt Sperre, auch vor dem Notfallpasswort (16.10.2026)
+
+**Anlass:** Auftrag aus `koordination` (`AUFTRAG-anmeldebremse-reihe.md`): die
+Bauart der Reihe, entschieden nach B74 aus `lernzeiten` und E35 aus
+`sprechtag`. Die Schule hat am 16.10. bestätigt, dass Lehrkräfte sich mit
+ihrem Kürzel anmelden – die Kürzel stehen öffentlich.
+
+**Lage (am Code):** `WebUntisAuth::tooManyAttempts()` zählte die
+Fehlversuche je Benutzername der letzten 15 Minuten und wies ab 5 ab – auch
+mit richtigem Passwort. Jeder abgewiesene Versuch wurde als
+`zu_viele_versuche` eingetragen und zählte selbst mit. Eine gelungene
+Anmeldung setzte nichts zurück. Ein Netzfehler zählte wie ein falsches
+Passwort (`falsches_passwort_oder_netzwerk`). **Das lokale Notfallpasswort
+prüfte `handleLogin` vor jeder Bremse.**
+
+**Entschieden (Betreiber):**
+
+1. Die Bauart der Reihe – eine Minute Wartezeit ab der Schwelle, nie eine
+   Sperre; zuerst eintragen, dann zählen; abgewiesene zählen nicht; eine
+   gelungene Anmeldung setzt zurück; WebUntis nicht erreichbar zählt nicht;
+   die Zählung scheitert geschlossen mit eigenem Satz. Die Schwelle bleibt 5.
+2. **Die Bremse kommt vor das Notfallpasswort.** Die Begründung des
+   Betreibers:
+
+   > Ein ungebremstes Passwort lässt sich in Ruhe durchprobieren, und der
+   > Notfallzugang ist der mächtigste. Die Minute Wartezeit kann ein
+   > Angreifer nur erzwingen, wenn er genau während eines Notfalls ein Skript
+   > laufen lässt.
+
+**Gebaut:** `App\Auth\Anmeldebremse` hält Bremse und Protokoll an einer
+Stelle; `handleLogin` fragt sie über `bremseBeginnen()` als ersten Schritt.
+Die Funktion steht außerhalb von `handleLogin`, weil dort jede Ablehnung 401
+ist, solange ein Passwort entschied (FALLSTRICKE 8, geprüft in
+`tests-schulprozesse.sh`) – an dieser Stelle hat noch keines entschieden.
+`WebUntisAuth` schreibt nicht mehr in `login_log`; es meldet über `grund()`,
+warum es `null` lieferte.
+
+**Beim Bauen gefunden:** Zählte „WebUntis nicht erreichbar“ einfach nicht,
+wäre das Notfallpasswort **genau im Notfall** wieder ungebremst gewesen – ein
+falsches lokales Passwort und ein toter WebUntis hätten den Versuch
+verworfen. Ein falsches Notfallpasswort ist ein Entscheid; es zählt auch dann
+(`falsches_lokales_passwort`). Belegt durch eine Prüfung, die `handleLogin`
+mit einem nicht erreichbaren WebUntis ausführt – sie war vor der Behebung rot.
+
+**Was nicht entschieden ist:** Die Herkunft als Merkmal (`login_log.ip` trägt
+hinter dem Proxy dessen Adresse, siehe `koordination` M53) – eigener Vorgang.
+
+**Bekannte Grenze:** Ein Skript, das einmal pro Minute fehlschlägt, hält ein
+Konto in der Wartezeit. Eine Prüfung hält das fest.

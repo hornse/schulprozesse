@@ -25,6 +25,14 @@ use RuntimeException;
 /**
  * Authentifiziert Benutzer gegen die WebUntis JSON-RPC-API.
  *
+ * PROJEKTEIGEN – NICHT VENDORED. Diese Datei ist der URSPRUNG der
+ * WebUntisAuth-Fassungen der Reihe, entstanden am 23.06.2026 mit dem
+ * ersten Commit dieses Projekts. Aus ihr entstand am 07.07.2026 die
+ * Fassung in projektstunden, und aus dieser am 09.07.2026 das Modul
+ * webuntis-auth-php. Sie ist keine Kopie des Moduls und wird nicht
+ * nachgezogen. Festgehalten am 21.10.2026 (Bericht koordination
+ * 2026-10-16, Anmeldebremse).
+ *
  * Diese Klasse ist bewusst eine eigenständige, von MRBS unabhängige
  * Variante des bestehenden Schul-Moduls `MRBS\Auth\AuthWebUntis`. Das
  * Grundprinzip (POST an /WebUntis/jsonrpc.do mit method=authenticate)

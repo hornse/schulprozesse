@@ -5,7 +5,10 @@ Diese Datei gibt Claude (und anderen KI-Assistenten) sofortigen Kontext
 **Bitte zu Beginn jeder Session lesen.**
 
 Ergänzend:
-- Entscheidungen mit Begründung, chronologisch: @docs/ENTSCHEIDUNGEN.md
+- Entscheidungen mit Begründung, chronologisch: `docs/ENTSCHEIDUNGEN.md` —
+  Nachschlagewerk, wird nicht bei jedem Start geladen (REIHENREGELN §10).
+  E1–E4 sind unten zusammengefasst; E5–E11 betreffen Verschieben, Phasen,
+  Bedienung und die Anmeldebremse.
 - Regeln der Reihe: @REIHENREGELN.md
 - Fallstricke PHP/Router/WebUntis: @FALLSTRICKE.md
 

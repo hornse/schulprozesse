@@ -77,6 +77,28 @@ else
 fi
 
 echo ""
+echo "Sperrliste im Router (tests/sperrliste_test.php, ausgeführt gegen php -S)"
+# Was Apache sperrt, liefert auch der Router nicht aus (S62, koordination).
+# Die Endungen kommen aus der beigelegten Kopie tests/daten/webroot.htaccess.
+# Jede Zeile zählt einzeln, auch die roten; fehlendes PHP und ein Abbruch
+# ohne rote Zeile sind rot.
+if ! command -v php > /dev/null 2>&1; then
+    rot "Sperrliste: php fehlt – die Suite lief nicht"
+else
+    SPERR_AUS=$(php tests/sperrliste_test.php 2>/dev/null); SPERR_EXIT=$?
+    while IFS= read -r z; do
+        case "$z" in
+            "  ✓ "*) gruen "Sperrliste: ${z#  ✓ }" ;;
+            "  ✗ "*) rot   "Sperrliste: ${z#  ✗ }" ;;
+            "      "*) echo "$z" ;;
+        esac
+    done <<< "$SPERR_AUS"
+    if [ "$SPERR_EXIT" -ne 0 ] && ! printf '%s\n' "$SPERR_AUS" | grep -q '^  ✗ '; then
+        rot "Sperrliste: Suite endete mit $SPERR_EXIT ohne rote Zeile"
+    fi
+fi
+
+echo ""
 echo "Datenschutz"
 # Kommentare vorher entfernen: Die Erklärung, warum der @import weg ist,
 # darf nicht als Fund gelten.

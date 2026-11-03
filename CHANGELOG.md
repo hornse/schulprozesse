@@ -8,6 +8,21 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 ## [Unreleased]
 
 ### Geändert
+- **Router: Sperrliste wie die Apache-Vorlage** (Auftrag aus `koordination`,
+  `AUFTRAG-router-sperrliste.md`, Lauf 2, Befund S62). Der Router reichte
+  jede vorhandene Datei unter `backend/public` an `php -S` zurück; am
+  03.11.2026 lieferte der Server `/.htaccess` aus (200, 826 Bytes). Jetzt
+  entscheidet `sp_pfad_gesperrt()` in `backend/src/sperrliste.php` (nicht
+  unter dem Docroot, dort würde `php -S` sie ausführen): Editor-Reste,
+  Daten, Einstellungen, Doku, Skripte und Punktdateien → 404, ob die Datei
+  existiert oder nicht. Der API-Zweig steht jetzt **vor** der Sperre (zwei
+  Routen haben ein freies Segment). Die `.htaccess` bleibt als
+  Apache-Rückfall (E3), nach außen ist sie 404.
+- **Prüfungen:** `tests/sperrliste_test.php` neu (73), eingebunden in
+  `tests-schulprozesse.sh`: ✓-Zeilen 71 → 144; vor der Behebung 81 ✓ /
+  63 ✗. Endungen und Punktregel aus der beigelegten Kopie
+  `tests/daten/webroot.htaccess`. `tests/mutationen_sperrliste.sh` neu:
+  11 Mutationen, alle angeschlagen.
 - **Anmeldebremse: Wartezeit statt Sperre** (Auftrag aus `koordination`,
   `AUFTRAG-anmeldebremse-reihe.md`, 16.10.2026; Begründung in
   `docs/ENTSCHEIDUNGEN.md`, E11). Vorher sperrte `WebUntisAuth` nach 5

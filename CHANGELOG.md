@@ -7,6 +7,22 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Geändert – Export nur für Teilnehmende (Z3, Auftrag koordination 04.11.2026)
+- **Verlauf und Export eines Prozesses nur für Teilnehmende und Admins.**
+  `GET /api/aktivitaeten`, `/api/export/aktivitaeten` und `/api/export/csv`
+  prüften nur die Anmeldung: Jedes Mitglied bekam jeden Prozess, auch einen
+  privaten, mit Namen und Kommentaren (ausgeführt belegt, Bericht in
+  koordination). Jetzt `Guard::requireProzessZugriff`, 403 sonst.
+- **Auch öffentliche Prozesse:** Das Dashboard zeigt sie ohne Personenfelder,
+  der Export enthält sie.
+- **Ohne `prozess_id` 400 „prozess_id fehlt.“** statt des jüngsten Prozesses,
+  welcher es auch sei; ebenso für `null` und `0`.
+- **Engstelle am Quelltext:** Jeder Endpunkt mit Prozesskennung (aus dem
+  Rumpf und aus den Routen ermittelt, heute 17) ruft eine Prozessprüfung.
+- **Prüfungen 179 → 199** (angekündigt). Rot vor der Behebung: 10 in
+  `tests/export_zugriff_test.php`, dazu die Folgezeile in `deploy_test.sh`.
+  Mutationen: `tests/mutationen_export.sh` 9/9.
+
 ### Geändert – Anmeldung, Doku und Hilfe (S74, Auftrag koordination 03.11.2026)
 - **Die Meldung beim Anmelden erscheint.** `api()` behandelte jeden 401 als
   abgelaufene Sitzung, zeichnete die Anmeldung neu und schrieb den Fehler in

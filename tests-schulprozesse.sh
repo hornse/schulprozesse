@@ -242,6 +242,27 @@ else
 fi
 
 echo ""
+echo "Export nur für Teilnehmende (tests/export_zugriff_test.php, export.php ausgeführt)"
+# Z3 (koordination AUFTRAG-schulprozesse-export.md): Verlauf und Export eines
+# Prozesses nur für Teilnehmende und Admins, auch bei öffentlichen; ohne
+# prozess_id 400 statt des jüngsten Prozesses. Die letzte Zeile ist eine
+# Prüfung am Quelltext (Engstelle) und sagt das.
+if ! command -v php > /dev/null 2>&1; then
+    rot "Export: php fehlt – nicht gelaufen"
+else
+    AUS=$(php tests/export_zugriff_test.php 2>/dev/null); EX=$?
+    while IFS= read -r z; do
+        case "$z" in
+            "  ✓ "*) gruen "Export: ${z#  ✓ }" ;;
+            "  ✗ "*) rot   "Export: ${z#  ✗ }" ;;
+        esac
+    done <<< "$AUS"
+    if [ "$EX" -ne 0 ] && ! printf '%s\n' "$AUS" | grep -q '^  ✗ '; then
+        rot "Export: endete mit $EX ohne rote Zeile"
+    fi
+fi
+
+echo ""
 echo "Anmeldung und Hilfe im Browser (tests/browser_test.mjs, Chromium ohne Fenster)"
 # V37: Ist ein Browser da, wird das Verhalten geprüft, nicht der Quelltext.
 # Fehlt node oder Chromium, läuft der Schritt sichtbar NICHT – die Zeile sagt

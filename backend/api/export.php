@@ -19,11 +19,13 @@ use App\Response;
 function handleListAktivitaeten(PDO $db, array $config, array $input): void
 {
     Guard::requireLogin($db);
-
-    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
-    if (!$prozessId) {
-        $prozessId = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetchColumn();
+    $prozessId = (int) ($input['prozess_id'] ?? 0);   // „null“ aus app.js wird 0
+    if ($prozessId <= 0) {
+        Response::error('prozess_id fehlt.', 400);
     }
+    // Nur Teilnehmende und Admins, auch bei öffentlichen Prozessen: Der
+    // Export enthält Personenfelder, das öffentliche Dashboard nicht (Z3).
+    Guard::requireProzessZugriff($db, $prozessId);
 
     $stmt = $db->prepare(
         'SELECT a.id, a.schritt_titel, a.ereignis, a.wert_neu, a.benutzer,
@@ -40,17 +42,17 @@ function handleListAktivitaeten(PDO $db, array $config, array $input): void
 function handleExportAktivitaeten(PDO $db, array $config, array $input): void
 {
     Guard::requireLogin($db);
-
-    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
-    if (!$prozessId) {
-        $row = $db->query('SELECT id, label FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
-        $prozessId = $row ? (int) $row['id'] : null;
-        $label = $row['label'] ?? 'export';
-    } else {
-        $row = $db->prepare('SELECT label FROM prozesse WHERE id = :id');
-        $row->execute([':id' => $prozessId]);
-        $label = $row->fetchColumn() ?: 'export';
+    $prozessId = (int) ($input['prozess_id'] ?? 0);   // „null“ aus app.js wird 0
+    if ($prozessId <= 0) {
+        Response::error('prozess_id fehlt.', 400);
     }
+    // Nur Teilnehmende und Admins, auch bei öffentlichen Prozessen: Der
+    // Export enthält Personenfelder, das öffentliche Dashboard nicht (Z3).
+    Guard::requireProzessZugriff($db, $prozessId);
+
+    $row = $db->prepare('SELECT label FROM prozesse WHERE id = :id');
+    $row->execute([':id' => $prozessId]);
+    $label = $row->fetchColumn() ?: 'export';
 
     $stmt = $db->prepare(
         'SELECT a.zeitstempel, a.anzeigename, a.schritt_titel, a.ereignis, a.wert_neu
@@ -94,17 +96,13 @@ function handleExportAktivitaeten(PDO $db, array $config, array $input): void
 function handleExportCsv(PDO $db, array $config, array $input): void
 {
     Guard::requireLogin($db);
-
-    $prozessId = isset($input['prozess_id']) ? (int) $input['prozess_id'] : null;
-
-    if (!$prozessId) {
-        $row = $db->query('SELECT id FROM prozesse ORDER BY erstellt_am DESC LIMIT 1')->fetch();
-        $prozessId = $row ? (int) $row['id'] : null;
+    $prozessId = (int) ($input['prozess_id'] ?? 0);   // „null“ aus app.js wird 0
+    if ($prozessId <= 0) {
+        Response::error('prozess_id fehlt.', 400);
     }
-
-    if (!$prozessId) {
-        Response::error('Kein aktives Schuljahr gefunden.', 404);
-    }
+    // Nur Teilnehmende und Admins, auch bei öffentlichen Prozessen: Der
+    // Export enthält Personenfelder, das öffentliche Dashboard nicht (Z3).
+    Guard::requireProzessZugriff($db, $prozessId);
 
     $schuljahrLabel = $db->prepare('SELECT label FROM prozesse WHERE id = :id');
     $schuljahrLabel->execute([':id' => $prozessId]);

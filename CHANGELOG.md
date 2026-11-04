@@ -7,6 +7,16 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Geändert – CSV-Export unter PHP 8.4 (Fund aus Z3)
+- **`fputcsv` nennt `$escape` ausdrücklich** (`'\\'`, der bisherige
+  Standardwert – die Ausgabe bleibt byte-gleich). Ohne das meldet PHP 8.4
+  je Aufruf `E_DEPRECATED`; `api-router.php` macht aus jedem gemeldeten
+  Fehler eine Ausnahme. Der Server läuft auf 8.4.27.
+- **Prüfungen 199 → 203** (angekündigt): Export ohne Hinweis, ausgeführt
+  unter 8.4 (2), mit Gegenprobe, dass die Messung den Hinweis sieht (1), und
+  am Quelltext jeder `fputcsv`-Aufruf in `backend/` mit `$escape` (1). Rot
+  vor der Behebung: 3. Mutationen: `tests/mutationen_export.sh` 11/11.
+
 ### Geändert – Export nur für Teilnehmende (Z3, Auftrag koordination 04.11.2026)
 - **Verlauf und Export eines Prozesses nur für Teilnehmende und Admins.**
   `GET /api/aktivitaeten`, `/api/export/aktivitaeten` und `/api/export/csv`

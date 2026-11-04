@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# tests/mutationen_export.sh – prüft die Prüfungen aus Z3
+# tests/mutationen_export.sh – prüft die Prüfungen aus Z3 und zu fputcsv (PHP 8.4)
 # (koordination AUFTRAG-schulprozesse-export.md)
 #
 # Jede Mutation wird an einer KOPIE des Arbeitsbaums angebracht (git-Klon,
@@ -89,9 +89,14 @@ for i in 0 1 2; do
 ${H[$i]} Mitglied ohne Teilnahme am öffentlichen P43
 OHNE: ${F[$i]}"
 done
-for i in 0 1 2; do
+# Entwertet trifft jeden Aufruf eines Teilnehmers – bei den beiden CSV-Endpunkten
+# also auch die Zeile „ohne Hinweis“, die als Teilnehmer exportiert.
+mutation "M4 Prüfung entwertet, ID 0 (${F[0]})" "$E" 1 "$ZG" '    Guard::requireProzessZugriff($db, 0);' \
+    "${H[0]} Teilnehmer an P41"
+for i in 1 2; do
     mutation "M$((i + 4)) Prüfung entwertet, ID 0 (${F[$i]})" "$E" $((i + 1)) "$ZG" '    Guard::requireProzessZugriff($db, 0);' \
-        "${H[$i]} Teilnehmer an P41"
+        "${H[$i]} Teilnehmer an P41
+${H[$i]} Teilnehmer bekommt 200 mit"
 done
 mutation "M7 Rückfall auf den jüngsten Prozess statt 400 (${F[0]})" "$E" 1 \
     "        Response::error('prozess_id fehlt.', 400);" \
@@ -103,6 +108,17 @@ mutation "M9 Code gelöscht, Kommentar bleibt (${F[2]})" "$E" 3 "$ZG" '    // Gu
     "${H[2]} Mitglied ohne Teilnahme an P41
 ${H[2]} Mitglied ohne Teilnahme am öffentlichen P43
 OHNE: ${F[2]}"
+
+# fputcsv unter PHP 8.4: $escape an einem Aufruf weglassen → Hinweis im Export
+# und die Prüfung am Quelltext. Erster Aufruf = Kopf des Aktivitäten-Exports,
+# dritter = Kopf des Schritt-Exports.
+FE="'\"', '\\\\');"
+mutation "M10 \$escape fehlt (fputcsv 1, Aktivitäten-Export)" "$E" 1 "';', $FE" "';');" \
+    "${H[1]} Teilnehmer bekommt 200 mit 3 Datensätzen und keinem Hinweis
+nennen \$escape (am Quelltext) – OHNE: export.php:82"
+mutation "M11 \$escape fehlt (fputcsv 3, Schritt-Export)" "$E" 3 "';', $FE" "';');" \
+    "${H[2]} Teilnehmer bekommt 200 mit 2 Datensätzen und keinem Hinweis
+nennen \$escape (am Quelltext) – OHNE: export.php:137"
 
 REPO_NACHHER=$(stand)
 if [ "$REPO_VORHER" = "$REPO_NACHHER" ]; then

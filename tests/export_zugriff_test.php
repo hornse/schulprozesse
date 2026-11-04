@@ -38,6 +38,10 @@ if (($argv[1] ?? '') === '--kind') {            // --kind <db> <handler> <user|-
     require "$W/backend/api/export.php";
     $db = new PDO("sqlite:$dbPfad", null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    if ($handler === 'fputcsvOhneEscape') {     // Gegenprobe der Messung: so sieht der Hinweis aus
+        fputcsv(fopen('php://memory', 'w'), ['a'], ';');
+        exit;
+    }
     if ($wer !== '-') $_SESSION['user'] = ['webuntis_user' => $wer, 'anzeigename' => 'x', 'rolle' => 'x'];
     register_shutdown_function(function (): void {
         $s = http_response_code();
@@ -160,6 +164,48 @@ foreach (ENDPUNKTE as $h => [$name]) {
     $a = rufe($h, '-', '41');
     pruefe("$name: ohne Anmeldung 401", $a['status'] === 401 && $a['fehler'] === 'Nicht angemeldet.');
 }
+
+// ---------------------------------------------------------------- PHP 8.4
+// fputcsv ohne $escape ist ab PHP 8.4 E_DEPRECATED, ein Hinweis je Aufruf.
+// api-router.php macht aus jedem gemeldeten Fehler eine ErrorException – ein
+// Export bräche dann nach dem BOM ab. Der Server läuft auf 8.4.27.
+echo PHP_EOL . 'CSV-Export ohne PHP-Hinweis (PHP ' . PHP_VERSION . ')' . PHP_EOL;
+$probe = rufe('fputcsvOhneEscape', '-', '-');
+pruefe('Voraussetzung: PHP ≥ 8.4, und ein fputcsv ohne $escape meldet hier einen Hinweis (die Messung sieht ihn)',
+    version_compare(PHP_VERSION, '8.4.0', '>=') && $probe['hinweise'] >= 1);
+foreach (['handleExportCsv' => ['GET /api/export/csv', 'schritte'],
+          'handleExportAktivitaeten' => ['GET /api/export/aktivitaeten', 'akt']] as $h => [$name, $art]) {
+    $a = rufe($h, 'tn', '41');
+    pruefe("$name: Teilnehmer bekommt 200 mit " . ERWARTET[41][$art] . ' Datensätzen und keinem Hinweis'
+        . ($a['hinweise'] ? " ({$a['hinweise']} Hinweise)" : ''),
+        $a['status'] === 200 && $a['zeilen'] === ERWARTET[41][$art] && $a['hinweise'] === 0);
+}
+// Am Quelltext, über backend/: jeder fputcsv-Aufruf nennt $escape (fünftes
+// Argument oder benannt). Ermittelt, nicht aufgezählt; null Aufrufe sind rot.
+$aufrufe = 0; $ohneEscape = [];
+$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator("$W/backend", FilesystemIterator::SKIP_DOTS));
+foreach ($it as $datei) {
+    if ($datei->getExtension() !== 'php') continue;
+    $t = array_values(array_filter(PhpToken::tokenize((string)file_get_contents((string)$datei)),
+        fn($x) => !$x->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT])));
+    for ($i = 0, $n = count($t); $i < $n; $i++) {
+        if (!($t[$i]->is(T_STRING) || $t[$i]->is(T_NAME_FULLY_QUALIFIED)) || ltrim($t[$i]->text, '\\') !== 'fputcsv'
+            || ($t[$i + 1]->text ?? '') !== '(' || ($i > 0 && $t[$i - 1]->is([T_FUNCTION, T_OBJECT_OPERATOR, T_DOUBLE_COLON]))) continue;
+        $aufrufe++;
+        $tiefe = 0; $kommas = 0; $benannt = false;
+        for ($j = $i + 1; $j < $n; $j++) {
+            $x = $t[$j]->text;
+            if (in_array($x, ['(', '[', '{'], true)) $tiefe++;
+            elseif (in_array($x, [')', ']', '}'], true)) { $tiefe--; if ($tiefe === 0) break; }
+            elseif ($tiefe === 1 && $x === ',') $kommas++;
+            elseif ($tiefe === 1 && $x === 'escape' && ($t[$j + 1]->text ?? '') === ':') $benannt = true;
+        }
+        if ($kommas < 4 && !$benannt) $ohneEscape[] = basename((string)$datei) . ':' . $t[$i]->line;
+    }
+}
+pruefe($aufrufe === 0 ? 'kein fputcsv in backend/ gefunden – nichts geprüft'
+    : "alle $aufrufe fputcsv-Aufrufe in backend/ nennen \$escape (am Quelltext)" . ($ohneEscape ? ' – OHNE: ' . implode(', ', $ohneEscape) : ''),
+    $aufrufe > 0 && $ohneEscape === []);
 
 // ---------------------------------------------------------------- Engstelle
 // AM QUELLTEXT, nicht ausgeführt. Ermittelt, nicht aufgezählt:

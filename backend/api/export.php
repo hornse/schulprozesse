@@ -79,7 +79,7 @@ function handleExportAktivitaeten(PDO $db, array $config, array $input): void
     ];
 
     $out = fopen('php://output', 'w');
-    fputcsv($out, ['Zeitstempel', 'Person', 'Schritt', 'Aktion', 'Wert'], ';');
+    fputcsv($out, ['Zeitstempel', 'Person', 'Schritt', 'Aktion', 'Wert'], ';', '"', '\\');
     foreach ($stmt->fetchAll() as $a) {
         fputcsv($out, [
             $a['zeitstempel'],
@@ -87,7 +87,7 @@ function handleExportAktivitaeten(PDO $db, array $config, array $input): void
             $a['schritt_titel'],
             $ereignisTexte[$a['ereignis']] ?? $a['ereignis'],
             $a['wert_neu'] ?? '',
-        ], ';');
+        ], ';', '"', '\\');
     }
     fclose($out);
     exit;
@@ -138,7 +138,7 @@ function handleExportCsv(PDO $db, array $config, array $input): void
         'Phase-Nr', 'Phase', 'Reihenfolge', 'Schritt',
         'Erledigt', 'Verantwortlich', 'Start', 'Zieldatum',
         'Erledigt am', 'Erledigt von', 'Kann parallel', 'Kommentar'
-    ], ';');
+    ], ';', '"', '\\');
 
     foreach ($schritte as $s) {
         fputcsv($out, [
@@ -154,7 +154,7 @@ function handleExportCsv(PDO $db, array $config, array $input): void
             $s['erledigt_von'] ?? '',
             $s['kann_parallel'] ? 'Ja' : 'Nein',
             $s['kommentar'] ?? '',
-        ], ';');
+        ], ';', '"', '\\');
     }
 
     fclose($out);

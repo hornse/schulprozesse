@@ -263,6 +263,25 @@ else
 fi
 
 echo ""
+echo "Phasen löschen nur für Admins (tests/phasen_loeschen_test.php, handleDeletePhase ausgeführt)"
+# Z4: Bis dahin löschte jeder Verantwortliche irgendeines Prozesses jede Phase,
+# mit den Schritten darin in allen Prozessen. Gemessen am Datenbankstand.
+if ! command -v php > /dev/null 2>&1; then
+    rot "Phasen: php fehlt – nicht gelaufen"
+else
+    AUS=$(php tests/phasen_loeschen_test.php 2>/dev/null); EX=$?
+    while IFS= read -r z; do
+        case "$z" in
+            "  ✓ "*) gruen "Phasen: ${z#  ✓ }" ;;
+            "  ✗ "*) rot   "Phasen: ${z#  ✗ }" ;;
+        esac
+    done <<< "$AUS"
+    if [ "$EX" -ne 0 ] && ! printf '%s\n' "$AUS" | grep -q '^  ✗ '; then
+        rot "Phasen: endete mit $EX ohne rote Zeile"
+    fi
+fi
+
+echo ""
 echo "Anmeldung und Hilfe im Browser (tests/browser_test.mjs, Chromium ohne Fenster)"
 # V37: Ist ein Browser da, wird das Verhalten geprüft, nicht der Quelltext.
 # Fehlt node oder Chromium, läuft der Schritt sichtbar NICHT – die Zeile sagt

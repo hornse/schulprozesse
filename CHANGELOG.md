@@ -7,6 +7,21 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Geändert – Phasen löschen nur für Admins (Z4)
+- **`DELETE /api/phasen/{id}` nur noch für Admins**, wie Anlegen, Ändern und
+  Reihenfolge. Bis dahin durfte jeder, der in irgendeinem Prozess
+  verantwortlich ist, jede Phase löschen – mit ihren Vorlagen und den
+  Schritten darin in **allen** Prozessen, auch fremden, und auch Phasen der
+  Standardvorlage (ausgeführt belegt). Die Regel stammt aus `b45e84c`
+  (25.06.2026), als der Vorlagen-Editor noch auf „Prozess verwalten“ lag;
+  heute steht er nur auf der Admin-Seite. Verantwortliche löschen eigene
+  Phasen weiter über `/api/instanz-schritte` – die Oberfläche ist
+  unverändert.
+- **Prüfungen 203 → 210** (angekündigt): `tests/phasen_loeschen_test.php`,
+  gemessen am Datenbankstand vorher und nachher. Rot vor der Behebung: 4,
+  dazu die Folgezeile in `deploy_test.sh`. Mutationen:
+  `tests/mutationen_phasen.sh` 4/4.
+
 ### Geändert – CSV-Export unter PHP 8.4 (Fund aus Z3)
 - **`fputcsv` nennt `$escape` ausdrücklich** (`'\\'`, der bisherige
   Standardwert – die Ausgabe bleibt byte-gleich). Ohne das meldet PHP 8.4

@@ -120,20 +120,12 @@ function handleReihenfolgePhasen(PDO $db, array $config, array $input): void
 
 function handleDeletePhase(PDO $db, array $config, array $input, array $params): void
 {
-    // Admins und Verantwortliche (für mindestens einen Prozess) dürfen Phasen löschen
-    $user = Guard::requireLogin($db);
-    if ($user['rolle'] !== 'admin') {
-        $stmt = $db->prepare(
-            "SELECT COUNT(*) FROM prozess_teilnehmer
-             WHERE webuntis_user = :u AND rolle = 'verantwortlich'"
-        );
-        $stmt->execute([':u' => $user['webuntis_user']]);
-        $istVerantwortlich = (int) $stmt->fetchColumn();
-
-        if (!$istVerantwortlich) {
-            Response::error('Nur Admins und Verantwortliche können Phasen löschen.', 403);
-        }
-    }
+    // Nur Admins, wie Anlegen, Ändern und Reihenfolge (Z4). Bis dahin durfte
+    // jeder Verantwortliche irgendeines Prozesses jede Phase löschen, mit den
+    // Schritten darin in allen Prozessen – ein Rest aus der Zeit, als der
+    // Vorlagen-Editor auf „Prozess verwalten“ lag (b45e84c). Verantwortliche
+    // ändern die Phasen ihres Prozesses über /instanz-phasen.
+    Guard::requireAdmin($db);
 
     $id = (int) $params['id'];
 

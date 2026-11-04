@@ -109,6 +109,10 @@ das Verschieben von Schritten per Drag-and-drop braucht (siehe CHANGELOG) –
 ohne sie schlägt das Verschieben eines Vorlage-Schritts in eine andere Phase
 fehl.
 
+**005 und 006 nur einmal.** Sie fügen Spalten mit `ALTER TABLE … ADD COLUMN`
+hinzu; SQLite kennt dafür kein `IF NOT EXISTS`. Ein zweiter Lauf bricht mit
+`duplicate column name` ab (gemessen am 04.11.2026 an einer leeren Datenbank).
+
 ### Schritt 11 – PHP Backend-Server einrichten (Uberspace)
 
 Auf Uberspace läuft die App über einen PHP built-in server statt direkt über Apache.
@@ -180,28 +184,22 @@ sqlite3 data/app.sqlite \
 ./deploy.sh "Beschreibung der Änderung"
 ```
 
-Das Script macht automatisch:
-1. Cache-Busting-Timestamp in `index.html` aktualisieren (Format `YYYYMMDDHHMM`)
-2. `git add -A && git commit`
-3. `git push github main && git push uberspace main`
+Was das Skript tut, in dieser Reihenfolge:
+1. Es hält an, solange etwas unverfolgt oder nicht committet ist, und nennt
+   es. Ausgeliefert wird, was committet ist.
+2. Es lässt `./tests-schulprozesse.sh` laufen. Rot heißt: keine Auslieferung.
+3. Es setzt den Cache-Stempel `?v=` in `backend/public/index.html` (Ausdruck
+   über beliebige Zeichen, damit auch `?v=DEV` getroffen wird; Format
+   `YYYYMMDDHHMMSS`, UTC).
+4. Es committet nur diese Datei – namentlich – und pusht nach `github` und
+   `uberspace`.
 
-Der post-receive Hook auf dem Server deployt automatisch nach `git push uberspace main`.
-Ein `supervisorctl restart` ist normalerweise nicht nötig da PHP-Dateien
+Der post-receive Hook auf dem Server checkt nach dem Push auf `uberspace` aus.
+Ein `supervisorctl restart` ist normalerweise nicht nötig, da PHP-Dateien
 bei jedem Request neu geladen werden.
 
-Manuell (ohne Script):
-```bash
-# Cache-Busting manuell aktualisieren
-python3 -c "
-import re, datetime
-ts = datetime.datetime.now().strftime('%Y%m%d%H%M')
-content = open('backend/public/index.html').read()
-open('backend/public/index.html', 'w').write(re.sub(r'\?v=\d+', f'?v={ts}', content))
-print(f'Timestamp: {ts}')
-"
-git add -A && git commit -m "Beschreibung"
-git push github main && git push uberspace main
-```
+**Keinen Weg von Hand.** Ein Push ohne das Skript liefert neuen Servercode mit
+altem Browsercode aus, und die Suite läuft nicht (REIHENREGELN 6).
 
 ### Uberspace-spezifische Konfiguration
 
@@ -218,4 +216,6 @@ Symlinks, Logs) ist dokumentiert in `deploy/uberspace.md`.
 | `002_seed_schritte.sql` | 13 WebUntis-Schritte + erster Prozess |
 | `003_einstellungen.sql` | Erscheinungsbild-Einstellungen |
 | `004_instanz_anpassungen.sql` | Instanz-Anpassungen (Phasen, eigene Schritte) |
+| `005_schritt_herkunft.sql` | Herkunft eigener Schritte (`schritt_vorlagen.prozess_id`), nur einmal |
+| `006_schritt_verschieben.sql` | Schritte in andere Phasen verschieben, nur einmal |
 | `seed_vorlagen_snapshots.sql` | 6 fertige Prozess-Vorlagen als Snapshots |

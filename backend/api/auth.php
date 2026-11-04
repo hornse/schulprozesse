@@ -51,7 +51,7 @@ function handleLogin(PDO $db, array $config, array $input): void
     $ip       = $_SERVER['REMOTE_ADDR'] ?? 'unbekannt';
 
     if (trim($username) === '' || $password === '') {
-        Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
+        Response::error(Anmeldebremse::SATZ_ABGELEHNT, 401);
     }
 
     // --- Schritt 0: Bremse – vor jedem Passwort ---
@@ -91,15 +91,20 @@ function handleLogin(PDO $db, array $config, array $input): void
     if ($result === null) {
         // Antwortete WebUntis nicht, hat kein Passwort entschieden und der
         // Versuch zählt nicht – es sei denn, das Notfallpasswort war falsch.
-        // Die Antwort bleibt in jedem Fall dieselbe.
-        if ($auth->grund() === 'ohne_entscheid' && $lokalFalsch) {
-            Anmeldebremse::abschliessen($db, $versuch, false, 'falsches_lokales_passwort');
-        } elseif ($auth->grund() === 'ohne_entscheid') {
-            Anmeldebremse::ohneEntscheid($db, $versuch);
+        // Die Antwort ist in beiden Fällen der Ausfallsatz mit 503: Mit 401
+        // verriete sie während eines Ausfalls, dass es zu diesem Kürzel ein
+        // Notfallpasswort gibt (FALLSTRICKE 8; Entscheidung Betreiber, S74).
+        if ($auth->grund() === 'ohne_entscheid') {
+            if ($lokalFalsch) {
+                Anmeldebremse::abschliessen($db, $versuch, false, 'falsches_lokales_passwort');
+            } else {
+                Anmeldebremse::ohneEntscheid($db, $versuch);
+            }
+            Response::error(Anmeldebremse::SATZ_AUSFALL, 503);
         } else {
             Anmeldebremse::abschliessen($db, $versuch, false, $auth->grund());
         }
-        Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
+        Response::error(Anmeldebremse::SATZ_ABGELEHNT, 401);
     }
 
     // --- Schritt 3: Freigabe-Prüfung ---
@@ -117,7 +122,7 @@ function handleLogin(PDO $db, array $config, array $input): void
         // Er zählt für die Bremse wie ein falsches Passwort – sonst verriete
         // das Ausbleiben der Wartezeit, dass das Passwort stimmte.
         Anmeldebremse::abschliessen($db, $versuch, false, 'nicht_freigegeben');
-        Response::error('Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.', 401);
+        Response::error(Anmeldebremse::SATZ_ABGELEHNT, 401);
     }
 
     Anmeldebremse::abschliessen($db, $versuch, true, null);
@@ -163,14 +168,15 @@ function findeBenutzerRolle(PDO $db, string $username): ?array
  * Steht außerhalb von handleLogin, weil dort jede Ablehnung 401 ist, solange
  * ein Passwort entschied; hier hat noch keines entschieden.
  *
- * Schwelle und Zählfenster aus config.php: security.max_failed_logins und
- * security.lockout_minutes (heißt weiter so, ist jetzt das Zählfenster).
+ * Die Schwelle ist Anmeldebremse::SCHWELLE (M56, S74) – security.max_failed_logins
+ * wird nicht mehr gelesen. Das Zählfenster kommt aus config.php:
+ * security.lockout_minutes (heißt weiter so, ist das Zählfenster).
  */
 function bremseBeginnen(PDO $db, array $config, string $username, string $ip): int
 {
     $r = Anmeldebremse::beginnen(
         $db, $username, $ip,
-        (int) ($config['security']['max_failed_logins'] ?? 5),
+        Anmeldebremse::SCHWELLE,
         (int) ($config['security']['lockout_minutes'] ?? 15)
     );
     if (!$r['urteil']['durch']) {

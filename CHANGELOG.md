@@ -7,6 +7,42 @@ Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.0.0
 
 ## [Unreleased]
 
+### Geändert – Anmeldung, Doku und Hilfe (S74, Auftrag koordination 03.11.2026)
+- **Die Meldung beim Anmelden erscheint.** `api()` behandelte jeden 401 als
+  abgelaufene Sitzung, zeichnete die Anmeldung neu und schrieb den Fehler in
+  das alte, ausgehängte Formular – bei falschem Passwort leerte sich das
+  Formular ohne Meldung. Jetzt geben die Aufrufstellen der Anmeldung und des
+  Starts `anmeldeweg: true` mit: Der Satz des Servers steht am Formular, der
+  Benutzername bleibt. Ein 401 mitten in einer Sitzung führt weiter zur
+  Anmeldung.
+- **Besucher ohne Anmeldung sehen wieder das öffentliche Dashboard.** Seit
+  `087f50c` (20.07.2026) führte der 401 von `/api/me` beim Start auf die
+  Anmeldemaske.
+- **WebUntis nicht erreichbar:** 503 „WebUntis ist gerade nicht erreichbar.
+  Bitte in ein paar Minuten erneut versuchen.“ (Wortlaut der Reihe) statt
+  des Ablehnungssatzes – auch bei falschem Notfallpasswort (zählt weiter),
+  sonst verriete die Antwort, dass es ein Notfallpasswort gibt.
+- **Acht Fehlversuche, als Konstante** `Anmeldebremse::SCHWELLE` (M56).
+  `security.max_failed_logins` wird nicht mehr gelesen und ist aus der
+  Vorlage entfernt; in der `config.php` auf dem Server kann der Eintrag
+  entfallen. Ablehnungs- und Ausfallsatz sind Konstanten in `Anmeldebremse`.
+- **`deploy.sh` lässt die Suite vor dem Commit laufen;** rot heißt keine
+  Auslieferung.
+- **Vorlage:** `allowed_person_types` `[2, 16]` wie im Betrieb und in
+  `docs/INSTALL.md`.
+- **Hilfe und Handbuch:** zwei Fragen (Wartezeit, WebUntis gestört), ein
+  Abschnitt zu den Meldungen der Anmeldung; Zählangaben zur Hilfe-Seite
+  gestrichen. Zitierte Sätze und Schwelle werden gegen den Code geprüft.
+- **Betriebsdoku:** Migrationen 005/006 (nur einmal einspielbar, gemessen),
+  `deploy.sh` statt Hand-Weg mit `git add -A`, Sperrliste
+  (`deploy/uberspace.md`, `docs/INSTALL.md`, `README.md`, `CLAUDE.md`).
+- **Prüfungen 144 → 179** (angekündigt nach Schritt 2: 177, mit den beiden
+  Entscheidungen 179 – genannt, bevor sie liefen). Rot vor der Behebung:
+  20 Fehler. Neu: `tests/anmeldung_test.php` (9, `handleLogin` ausgeführt),
+  `tests/browser_test.mjs` (16, Chromium ohne Fenster), `tests/handbuch_test.php`
+  (7), `tests/deploy_test.sh` (3, Probe-Klon), personType (1). Entfallen: die
+  Prüfung „einheitlich 401“ am Quelltext (−1), ersetzt durch die ausgeführten.
+
 ### Geändert
 - **Router: Sperrliste wie die Apache-Vorlage** (Auftrag aus `koordination`,
   `AUFTRAG-router-sperrliste.md`, Lauf 2, Befund S62). Der Router reichte

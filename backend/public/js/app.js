@@ -35,7 +35,18 @@ const $prozessLeiste = document.getElementById('prozess-leiste');
 // ============================================================================
 // API-Wrapper
 // ============================================================================
-async function api(path, { method = 'GET', body } = {}) {
+/**
+ * Ein Aufruf der API.
+ *
+ * Ein 401 heißt in einer laufenden Sitzung: Sie ist abgelaufen – zurück zur
+ * Anmeldung. Auf dem ANMELDEWEG heißt er etwas anderes: beim Anmelden „diese
+ * Zugangsdaten nicht“ (der Satz des Servers gehört an das Formular, das noch
+ * dasteht), beim Start „niemand angemeldet“ (Besucher sehen das öffentliche
+ * Dashboard). Diese beiden Aufrufstellen geben `anmeldeweg: true` mit; der
+ * 401 läuft dann wie jeder andere Fehler als Ausnahme mit dem Satz des
+ * Servers zurück (S74).
+ */
+async function api(path, { method = 'GET', body, anmeldeweg = false } = {}) {
   const headers = {};
   if (method !== 'GET') headers['X-Requested-With'] = 'SchuljahreswechselApp';
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -47,7 +58,7 @@ async function api(path, { method = 'GET', body } = {}) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401) {
+  if (res.status === 401 && !anmeldeweg) {
     // Session abgelaufen – zur Login-Seite
     STATE.user = null;
     STATE.ansicht = 'login';
@@ -62,11 +73,11 @@ async function api(path, { method = 'GET', body } = {}) {
 // Auth
 // ============================================================================
 async function checkAuth() {
-  try { STATE.user = await api('/api/me'); } catch { STATE.user = null; }
+  try { STATE.user = await api('/api/me', { anmeldeweg: true }); } catch { STATE.user = null; }
 }
 
 async function doLogin(username, password) {
-  STATE.user = await api('/api/login', { method: 'POST', body: { username, password } });
+  STATE.user = await api('/api/login', { method: 'POST', body: { username, password }, anmeldeweg: true });
   await ladeAlles();
   STATE.ansicht = 'dashboard';
   render();
@@ -3365,7 +3376,23 @@ function renderFaq(schulname) {
   const wrapper = document.createElement('div');
   wrapper.className = 'hilfe-faq';
 
+  // Die zitierten Sätze stehen wörtlich in backend/src/Auth/Anmeldebremse.php;
+  // tests/browser_test.mjs vergleicht den sichtbaren Text mit dem Code (S74).
   const fragen = [
+    {
+      frage: 'Ich habe mich mehrmals vertippt und muss jetzt warten.',
+      antwort: `Bei falschen Zugangsdaten zeigt die App „Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.“
+                Nach acht Fehlversuchen heißt es „Zu viele Fehlversuche. Erneut versuchen in noch … Sekunden.“
+                Warte die Minute ab und versuche es dann noch einmal – gesperrt wird nichts.
+                Eine gelungene Anmeldung setzt die Zählung zurück.`,
+    },
+    {
+      frage: 'Beim Anmelden steht, dass WebUntis nicht erreichbar ist.',
+      antwort: `Die App prüft dein Passwort bei WebUntis. Antwortet WebUntis nicht, zeigt sie
+                „WebUntis ist gerade nicht erreichbar. Bitte in ein paar Minuten erneut versuchen.“
+                Warte ein paar Minuten und versuche es dann noch einmal. Hält die Störung an,
+                sag der zuständigen Person Bescheid.`,
+    },
     {
       frage: 'Ich kann mich nicht anmelden, obwohl mein Passwort korrekt ist.',
       antwort: `Ein korrektes WebUntis-Passwort allein reicht nicht. Zusätzlich muss ein Admin

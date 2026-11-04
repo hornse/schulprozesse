@@ -216,37 +216,112 @@ grep -q "config/config.php" .gitignore 2>/dev/null \
     && gruen "config.php ausgeschlossen" || rot "config.php nicht ausgeschlossen"
 
 echo ""
-echo "Anmeldung"
-# Der Fehlschlag des ZWEITEN Anmeldeschritts darf nicht anders aussehen als
-# ein falsches Passwort. Sonst unterscheidet ein Angreifer "Passwort falsch"
-# von "Passwort richtig, kein Datensatz", und die Anwendung wird zum
-# Pruefstand fuer fremde Zugangsdaten. FALLSTRICKE.md Abschnitt 8.
-#
-# Geprueft wird die FUNKTION, nicht die Datei: Eine Rechtepruefung an einer
-# bestehenden Sitzung DARF unterscheiden, dort war kein Passwort im Spiel.
-# Solche Stellen liegen ausserhalb von handleLogin und muessen gruen bleiben.
-#
-# Der Statuscode wird nicht zeilenweise gesucht. Er steht hier auf einer
-# eigenen Zeile, und ein zeilenweiser Ausdruck faende ihn nicht.
-AUTH=backend/api/auth.php
-RUMPF=$(awk '/^function handleLogin\(/ {f=1} f {print} f && /^\}/ {exit}' "$AUTH" 2>/dev/null | tr '\n' ' ')
-if [ -z "$RUMPF" ]; then
-    rot "Anmeldung: handleLogin() nicht gefunden – die Pruefung fand ihre Voraussetzung nicht"
+echo "Anmeldung (tests/anmeldung_test.php, handleLogin ausgeführt)"
+# FALLSTRICKE 8: Solange ein Passwort entschied, ist jede Ablehnung derselbe
+# Satz mit 401; nur 429 (warten) und 503 (WebUntis-Ausfall) unterscheiden
+# sich. AUSGEFÜHRT – die frühere Prüfung am Quelltext („nur 401 in
+# handleLogin“) hätte den 503 des Ausfalls nicht von einem verratenen
+# Passwort unterscheiden können (S74).
+if ! command -v php > /dev/null 2>&1; then
+    rot "Anmeldung: php fehlt – nicht gelaufen"
 else
-    CODES=$(printf '%s' "$RUMPF" | awk '{
-        n = split($0, t, /Response::error\(/)
-        for (i = 2; i <= n; i++) {
-            u = t[i]; sub(/\);.*/, "", u)
-            if (match(u, /[0-9][0-9][0-9][ \t]*$/)) print substr(u, RSTART, 3)
-        }
-    }' | sort -u | tr '\n' ' ' | sed 's/ *$//')
-    if [ -z "$CODES" ]; then
-        rot "Anmeldung: kein Statuscode in handleLogin gefunden – prueft die Pruefung noch etwas?"
-    elif [ "$CODES" = "401" ]; then
-        gruen "Anmeldung lehnt einheitlich mit 401 ab"
+    AUS=$(php tests/anmeldung_test.php 2>/dev/null); EX=$?
+    if [ "$EX" -eq 3 ]; then
+        printf '%s\n' "$AUS" | sed 's/^  ÜBERSPRUNGEN: /  –  ÜBERSPRUNGEN: /'
     else
-        rot "Anmeldung lehnt uneinheitlich ab (Statuscodes: $CODES)"
+        while IFS= read -r z; do
+            case "$z" in
+                "  ✓ "*) gruen "Anmeldung: ${z#  ✓ }" ;;
+                "  ✗ "*) rot   "Anmeldung: ${z#  ✗ }" ;;
+            esac
+        done <<< "$AUS"
+        if [ "$EX" -ne 0 ] && ! printf '%s\n' "$AUS" | grep -q '^  ✗ '; then
+            rot "Anmeldung: endete mit $EX ohne rote Zeile"
+        fi
     fi
+fi
+
+echo ""
+echo "Anmeldung und Hilfe im Browser (tests/browser_test.mjs, Chromium ohne Fenster)"
+# V37: Ist ein Browser da, wird das Verhalten geprüft, nicht der Quelltext.
+# Fehlt node oder Chromium, läuft der Schritt sichtbar NICHT – die Zeile sagt
+# es, und die Prüfungszahl ist um diese Prüfungen kleiner.
+if ! command -v node > /dev/null 2>&1; then
+    echo "  –  ÜBERSPRUNGEN: node fehlt – Anmeldung und Hilfe nicht im Browser geprüft"
+else
+    AUS=$(node tests/browser_test.mjs 2>/dev/null); EX=$?
+    if [ "$EX" -eq 3 ]; then
+        printf '%s\n' "$AUS" | sed 's/^  ÜBERSPRUNGEN: /  –  ÜBERSPRUNGEN: /'
+    else
+        while IFS= read -r z; do
+            case "$z" in
+                "  ✓ "*) gruen "Browser: ${z#  ✓ }" ;;
+                "  ✗ "*) rot   "Browser: ${z#  ✗ }" ;;
+            esac
+        done <<< "$AUS"
+        if [ "$EX" -ne 0 ] && ! printf '%s\n' "$AUS" | grep -q '^  ✗ '; then
+            rot "Browser: endete mit $EX ohne rote Zeile"
+        fi
+    fi
+fi
+
+echo ""
+echo "Benutzerhandbuch zitiert die Anwendung (tests/handbuch_test.php)"
+# Sätze und Schwelle gegen backend/src/Auth/Anmeldebremse.php (S74, C).
+if ! command -v php > /dev/null 2>&1; then
+    rot "Handbuch: php fehlt – nicht gelaufen"
+else
+    AUS=$(php tests/handbuch_test.php 2>/dev/null); EX=$?
+    if [ "$EX" -eq 3 ]; then
+        printf '%s\n' "$AUS" | sed 's/^  ÜBERSPRUNGEN: /  –  ÜBERSPRUNGEN: /'
+    else
+        while IFS= read -r z; do
+            case "$z" in
+                "  ✓ "*) gruen "Handbuch: ${z#  ✓ }" ;;
+                "  ✗ "*) rot   "Handbuch: ${z#  ✗ }" ;;
+            esac
+        done <<< "$AUS"
+        if [ "$EX" -ne 0 ] && ! printf '%s\n' "$AUS" | grep -q '^  ✗ '; then
+            rot "Handbuch: endete mit $EX ohne rote Zeile"
+        fi
+    fi
+fi
+
+echo ""
+echo "deploy.sh lässt die Suite laufen (tests/deploy_test.sh, ausgeführt im Probe-Klon)"
+# REIHENREGELN 6. Im Probe-Klon ruft die Suite diesen Abschnitt nicht noch
+# einmal auf und meldet das sichtbar.
+if false; then
+    :
+else
+    AUS=$(tests/deploy_test.sh 2>/dev/null); EX=$?
+    if [ "$EX" -eq 3 ]; then
+        printf '%s\n' "$AUS" | sed 's/^  ÜBERSPRUNGEN: /  –  ÜBERSPRUNGEN: /'
+    else
+        while IFS= read -r z; do
+            case "$z" in
+                "  ✓ "*) gruen "deploy.sh: ${z#  ✓ }" ;;
+                "  ✗ "*) rot   "deploy.sh: ${z#  ✗ }" ;;
+            esac
+        done <<< "$AUS"
+        if [ "$EX" -ne 0 ] && ! printf '%s\n' "$AUS" | grep -q '^  ✗ '; then
+            rot "deploy.sh: endete mit $EX ohne rote Zeile"
+        fi
+    fi
+fi
+
+echo ""
+echo "INSTALL.md und Vorlage nennen dieselben personType"
+# allowed_person_types im Betrieb: [2, 16] (Betreiber, 03.11.2026). Die
+# Vorlage ist ausgerichtet; INSTALL.md darf nicht davon abweichen (S74, B).
+VORLAGE_PT=$(php -r '$c = require "config/config.example.php"; echo json_encode($c["webuntis"]["allowed_person_types"] ?? null);' 2>/dev/null)
+INSTALL_PT=$(grep -o "'allowed_person_types' => \[[0-9, ]*\]" docs/INSTALL.md | sed 's/.*=> //; s/ //g' | sort -u)
+if [ -z "$INSTALL_PT" ] || [ -z "$VORLAGE_PT" ] || [ "$VORLAGE_PT" = "null" ]; then
+    rot "personType: nicht gefunden (Vorlage ${VORLAGE_PT:-leer}, INSTALL ${INSTALL_PT:-leer}) – nichts geprüft"
+elif [ "$INSTALL_PT" = "$VORLAGE_PT" ]; then
+    gruen "personType: INSTALL.md und config.example.php nennen $VORLAGE_PT"
+else
+    rot "personType: INSTALL.md nennt $(printf '%s' "$INSTALL_PT" | tr '\n' ' '), die Vorlage $VORLAGE_PT"
 fi
 
 echo ""

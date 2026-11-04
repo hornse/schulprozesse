@@ -33,8 +33,9 @@ return [
         //   \$r=json_decode(file_get_contents(\$u,false,\$ctx),true);
         //   echo \$r['result']['personType']??'n/a';"
         //
-        // Beispiel für Lehrkräfte + WebUntis-Admins: [2, 16]
-        'allowed_person_types' => [2],
+        // Im Betrieb: Lehrkräfte und WebUntis-Admins (Betreiber, 03.11.2026).
+        // tests-schulprozesse.sh prüft, dass docs/INSTALL.md dasselbe nennt.
+        'allowed_person_types' => [2, 16],
         // Timeouts in Sekunden, damit ein langsames/ausgefallenes WebUntis
         // nicht den PHP-Prozess blockiert.
         'connect_timeout' => 5,
@@ -52,13 +53,15 @@ return [
         'lifetime_minutes' => 480, // 8 Stunden
     ],
 
-    // Anmeldebremse (App\Auth\Anmeldebremse): ab dieser Anzahl Fehlversuche
+    // Anmeldebremse (App\Auth\Anmeldebremse): Nach acht Fehlversuchen
     // innerhalb des Fensters heißt es eine Minute warten – je Benutzername,
     // vor dem Notfallpasswort und BEVOR eine Anfrage an WebUntis geht. Nie
-    // eine Sperre; eine gelungene Anmeldung setzt zurück. `lockout_minutes`
-    // heißt aus Verträglichkeit so und ist das Zählfenster.
+    // eine Sperre; eine gelungene Anmeldung setzt zurück.
+    // Die SCHWELLE steht im Code (Anmeldebremse::SCHWELLE, M56) und nicht
+    // hier; ein Eintrag max_failed_logins in einer älteren config.php wird
+    // nicht mehr gelesen und kann entfallen. `lockout_minutes` heißt aus
+    // Verträglichkeit so und ist das Zählfenster.
     'security' => [
-        'max_failed_logins' => 5,
         'lockout_minutes'   => 15,
     ],
 

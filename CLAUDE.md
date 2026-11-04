@@ -41,7 +41,7 @@ Ergänzend:
 | Frontend | Vanilla JS, HTML, CSS – kein Build-Schritt |
 | Backend | PHP 8.1+, Namespace `App\`, PSR-4-Autoloader |
 | Datenbank | **SQLite** (nicht MariaDB!) |
-| Auth | WebUntis JSON-RPC (nur Lehrer, kein lokaler Login) |
+| Auth | WebUntis JSON-RPC (Lehrkräfte, WebUntis-Admins); dazu optional ein Notfallpasswort, nur per SQL gesetzt |
 | Hosting | Uberspace 7, PHP built-in Server, supervisord |
 
 ---
@@ -60,6 +60,7 @@ schulprozesse/
 │   │   └── vendor/ci-css/      ← Modul hornse/ci-css, vendored (siehe E1)
 │   ├── src/
 │   │   ├── Auth/
+│   │   │   ├── Anmeldebremse.php   ← Bremse, Schwelle, Sätze der Anmeldung
 │   │   │   └── WebUntisAuth.php
 │   │   ├── Database.php
 │   │   ├── Guard.php
@@ -120,7 +121,11 @@ Die Datei liegt unter `data/app.sqlite` und steht nicht in git.
 | `client` | `SchuljahreswechselApp` |
 | `allowed_person_types` | `[2, 16]` (kein Schüler-Login) |
 
-**Kein lokaler E-Mail/Passwort-Login** – nur WebUntis.
+**Kein lokaler E-Mail/Passwort-Login für den Alltag** – angemeldet wird über
+WebUntis. Für den Ausfall gibt es ein **Notfallpasswort** (bcrypt in
+`benutzer_rollen.passwort_hash`, nur per SQL gesetzt, `docs/INSTALL.md`,
+„Notfall-Passwort“). Es wird vor WebUntis geprüft und ist wie jeder andere
+Versuch gebremst (`backend/api/auth.php`).
 
 **Was über die WebUntis-API gemessen ist, liegt verstreut.** Die Liste
 aller Fundstellen steht in
@@ -165,7 +170,7 @@ ohne DB-Eintrag. Alle User sind in der DB.
 | DB | MariaDB, PDO, defines | SQLite, PDO, Array-Config |
 | API | Alles in `api/index.php` | Je Ressource eigene Datei |
 | Namespace | Kein Namespace | `App\` mit Autoloader |
-| Auth | WebUntis + lokal | Nur WebUntis |
+| Auth | WebUntis + lokal | WebUntis, Notfallpasswort für den Ausfall |
 | Session | Funktionen in config.php | Klasse `App\Session` |
 | Router | `backend/router.php` | `backend/public/dev-router.php` |
 
@@ -203,10 +208,10 @@ supervisorctl tail schulprozesse stderr | tail -20
 
 # SQLite direkt abfragen
 sqlite3 /var/www/virtual/hornse/schulprozesse-src/data/app.sqlite \
-  "SELECT * FROM benutzer LIMIT 5;"
+  "SELECT webuntis_user, rolle FROM benutzer_rollen LIMIT 5;"
 
 # API testen
-curl -s https://prozesse.hornse.de/api/auth/me \
+curl -s https://prozesse.hornse.de/api/me \
   -H "Cookie: swj_session=SESSIONID"
 ```
 
@@ -241,7 +246,8 @@ benannten Ausnahmeliste für bekannte Altlasten
 
 `tests-schulprozesse.sh` setzt `export LC_ALL=C` in Zeile 10. Es läuft
 ohne `-e` (nur `set -uo pipefail`); `deploy.sh` läuft mit `set -e`, aber
-ohne `grep`.
+ohne `grep`, und ruft die Suite seit S74 vor dem Commit auf – rot heißt
+keine Auslieferung.
 
 `deploy.sh` erreicht den Push auch dann, wenn es nichts zu committen
 gibt — seit dem 17.08.2026, Commit `753709a`. Anlass war ein
@@ -263,7 +269,13 @@ reparierte grün.
 ```
 
 Deckt ab: `app.js`-Syntax, die Phasen-Gruppierung
-(`tests/gruppierung.test.js`), Datenschutz (keine externen
+(`tests/gruppierung.test.js`), die Anmeldebremse
+(`tests/anmeldebremse_test.php`), die Antworten der Anmeldung
+(`tests/anmeldung_test.php`), Anmeldung und Hilfe im Browser
+(`tests/browser_test.mjs`, Chromium ohne Fenster; fehlt er, sichtbar
+übersprungen), das Handbuch gegen den Code (`tests/handbuch_test.php`),
+`deploy.sh` im Probe-Klon (`tests/deploy_test.sh`), die Sperrliste im Router
+(`tests/sperrliste_test.php`), Datenschutz (keine externen
 Schriften/Ressourcen), keine Rohfarben außerhalb des `:root`-Blocks,
 vollständige ci-Tokens, Einbindung von Modul und Kopfleiste, keine
 doppelten Shell-Regeln, alle von `app.js` gesetzten Klassen haben eine

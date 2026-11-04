@@ -4,13 +4,32 @@
 
 ## Für neue Nutzer: Schnelleinstieg
 
-Die App hat eine eingebaute **Hilfe-Seite** (Tab „?" in der Navigation)
-die ohne Anmeldung zugänglich ist. Dort finden sich Erste Schritte und FAQ.
+Die App hat eine eingebaute **Hilfe-Seite** („Hilfe“ in der Navigation, am
+Telefon über „Menü“), die ohne Anmeldung zugänglich ist. Dort finden sich
+Erste Schritte, häufige Fragen und das Handbuch.
 
 Kurzübersicht:
 1. URL aufrufen → „Anmelden" → WebUntis-Zugangsdaten eingeben
 2. Falls Login scheitert: Admin um Freischaltung bitten
 3. Nach Anmeldung: Prozess-Tab auswählen → Checkliste bearbeiten
+
+---
+
+## Anmeldung: was die Meldungen heißen
+
+<!-- Die Sätze stehen wörtlich in backend/src/Auth/Anmeldebremse.php;
+     tests/handbuch_test.php prüft sie gegen den Code. -->
+
+- **Falsche Zugangsdaten:** Die App zeigt „Anmeldung nicht möglich. Bitte
+  Zugangsdaten prüfen.“ Derselbe Satz erscheint, wenn die Person für die App
+  nicht freigegeben ist – dann hilft nur die Freigabe durch einen Admin.
+- **Wartezeit:** Nach acht Fehlversuchen heißt es „Zu viele Fehlversuche.
+  Erneut versuchen in noch … Sekunden.“ Nach einer Minute geht es weiter;
+  gesperrt wird nichts. Eine gelungene Anmeldung setzt die Zählung zurück.
+- **WebUntis gestört:** „WebUntis ist gerade nicht erreichbar. Bitte in ein
+  paar Minuten erneut versuchen.“ Das zählt nicht als Fehlversuch – außer bei
+  einem falschen Notfallpasswort. Hält die Störung an, die zuständige Person
+  informieren.
 
 ---
 
@@ -157,10 +176,12 @@ Standard-Vorlagentabelle (globale Phasen/Schritte) pflegen.
 
 ## Hilfe-Seite (ohne Login)
 
-Tab „?" in der Navigation. Zwei Bereiche:
-- **Erste Schritte** – 6 Karten: Was ist die App, Anmeldung, Prozess-Tabs,
-  Schritte erledigen, Ansichten, Ansprechpartner
-- **FAQ** – 10 aufklappbare Fragen zu häufigen Problemen
+„Hilfe“ in der Navigation (am Telefon über „Menü“). Die Reiter:
+- **Erste Schritte** – Karten zu den Grundlagen: Was ist die App, Anmeldung,
+  Prozess-Tabs, Schritte erledigen, Ansichten, Ansprechpartner
+- **Häufige Fragen (FAQ)** – aufklappbare Fragen zu häufigen Problemen, auch
+  zu den Meldungen bei der Anmeldung
+- **Vollständiges Handbuch**
 
 ---
 

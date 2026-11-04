@@ -44,8 +44,13 @@ use App\Auth\WebUntisAuth;
 $da = class_exists(Anmeldebremse::class);
 pruefe('Voraussetzung: App\Auth\Anmeldebremse vorhanden', $da);
 
-const SCHWELLE = 5;     // config.example.php, security.max_failed_logins
+// Parameter der Prüfungen am Mechanismus (Urteil, beginnen): Sie geben die
+// Schwelle selbst mit. Die Schwelle IM BETRIEB ist Anmeldebremse::SCHWELLE
+// (M56, S74) und gilt unten im ganzen Weg und in tests/anmeldung_test.php.
+const SCHWELLE = 5;
 const FENSTER  = 15;    // config.example.php, security.lockout_minutes
+// Der Ausfallsatz der Reihe (lernzeiten, kurse, signage, projektstunden).
+const AUSFALL = 'WebUntis ist gerade nicht erreichbar. Bitte in ein paar Minuten erneut versuchen.';
 
 // ---- das Urteil, rein ------------------------------------------------------
 echo PHP_EOL . 'Das Urteil: ab der Schwelle 60 Sekunden, ohne Staffel' . PHP_EOL;
@@ -226,12 +231,17 @@ $login = function (PDO $p, string $wer, string $pw) use ($config): array {
 $p = $notfall();
 $r = $login($p, 'notfalladmin', 'falsch-1');
 $alle = $p->query('SELECT erfolgreich, grund FROM login_log')->fetchAll();
-pruefe('Notfallpasswort falsch, WebUntis tot: 401 – und der Versuch zählt, denn das lokale Passwort hat entschieden',
-    $r['status'] === 401 && count($alle) === 1 && (int)$alle[0]['erfolgreich'] === 0);
+// Die Antwort ist dieselbe wie ohne Notfallpasswort (503): Mit 401 verriete
+// sie während eines Ausfalls, dass es zu diesem Kürzel ein Notfallpasswort
+// gibt (FALLSTRICKE 8; Entscheidung Betreiber 03.11.2026, S74).
+pruefe('Notfallpasswort falsch, WebUntis tot: 503 mit dem Ausfallsatz – und der Versuch zählt, denn das lokale Passwort hat entschieden',
+    $r['status'] === 503 && ($r['daten']['error'] ?? null) === AUSFALL
+    && count($alle) === 1 && (int)$alle[0]['erfolgreich'] === 0);
 $p = $notfall();
-for ($i = 0; $i < SCHWELLE; $i++) $login($p, 'notfalladmin', 'falsch-' . $i);
+$betrieb = defined(Anmeldebremse::class . '::SCHWELLE') ? Anmeldebremse::SCHWELLE : 5;
+for ($i = 0; $i < $betrieb; $i++) $login($p, 'notfalladmin', 'falsch-' . $i);
 $r = $login($p, 'notfalladmin', 'Der Notfall ist heute');
-pruefe('fünf falsche Notfallpasswörter gerade eben: auch das richtige wartet – 429 mit Sekunden',
+pruefe('so viele falsche Notfallpasswörter wie die Schwelle im Betrieb, gerade eben: auch das richtige wartet – 429 mit Sekunden',
     $r['status'] === 429 && preg_match('/noch \d+ Sekunden?\./', (string)($r['daten']['error'] ?? '')) === 1);
 $p = $notfall();
 $r = $login($p, 'notfalladmin', 'Der Notfall ist heute');
@@ -240,8 +250,8 @@ pruefe('Notfallpasswort richtig: angemeldet, eine Zeile – erfolgreich, „loka
     $r['status'] === 200 && count($alle) === 1 && (int)$alle[0]['erfolgreich'] === 1 && $alle[0]['grund'] === 'lokal');
 $p = $notfall();
 $r = $login($p, 'ho', 'irgendwas');
-pruefe('ohne Notfallpasswort, WebUntis tot: 401, und es bleibt keine Zeile – kein Passwort hat entschieden',
-    $r['status'] === 401 && $zeilen($p) === 0);
+pruefe('ohne Notfallpasswort, WebUntis tot: 503 mit dem Ausfallsatz, und es bleibt keine Zeile – kein Passwort hat entschieden',
+    $r['status'] === 503 && ($r['daten']['error'] ?? null) === AUSFALL && $zeilen($p) === 0);
 
 // ---- die Aufrufstelle -------------------------------------------------------
 // Rückfall, gekennzeichnet: handleLogin endet mit Response::…(exit) und wird

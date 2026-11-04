@@ -48,6 +48,20 @@ use PDO;
 final class Anmeldebremse
 {
     public const WARTEN_SEKUNDEN = 60;
+    /**
+     * Ab so vielen Fehlversuchen heißt es warten (M56 der Reihe, S74). Steht
+     * hier und nirgends sonst: `security.max_failed_logins` in config.php wird
+     * nicht mehr gelesen – zwei Stellen für dieselbe Schwelle wären zwei
+     * Wahrheiten, und die auf dem Server sieht niemand.
+     */
+    public const SCHWELLE = 8;
+    /**
+     * Jede Ablehnung, bei der ein Passwort entschied: falsches Passwort,
+     * falscher Kontotyp, keine Freigabe, leere Eingabe (FALLSTRICKE 8).
+     */
+    public const SATZ_ABGELEHNT = 'Anmeldung nicht möglich. Bitte Zugangsdaten prüfen.';
+    /** WebUntis antwortete nicht (503). Wortlaut der Reihe. */
+    public const SATZ_AUSFALL = 'WebUntis ist gerade nicht erreichbar. Bitte in ein paar Minuten erneut versuchen.';
     /** Grund eines Versuchs, der gerade läuft. */
     public const LAEUFT = '(läuft)';
 

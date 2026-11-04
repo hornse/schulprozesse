@@ -34,6 +34,16 @@ if [ -n "$UNGETRACKT" ] || [ -n "$GEAENDERT" ]; then
 fi
 echo "== Vor der Auslieferung: nichts Unverfolgtes, nichts ungeprueft Geaendertes =="
 
+# DIE PRUEFUNGEN LAUFEN VOR DEM COMMIT (REIHENREGELN 6, S74). Bis hier lief
+# die Suite nicht mit: Ein roter Stand waere committet und ausgeliefert
+# worden. Rot heisst: kein Stempel, kein Commit, kein Push. Belegt mit
+# tests/deploy_test.sh (Probe-Klon, lokale Gegenstellen).
+echo "== Pruefungen: ./tests-schulprozesse.sh =="
+if ! ./tests-schulprozesse.sh; then
+  echo "!! Pruefungen rot – keine Auslieferung." >&2
+  exit 1
+fi
+
 MSG="${1}"
 if [ -z "$MSG" ]; then
   read -p "Commit-Nachricht: " MSG

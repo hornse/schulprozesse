@@ -83,9 +83,17 @@ mut S14 backend/src/Auth/WebUntisAuth.php 's/\$this->grund = \x27ohne_entscheid\
   "WebUntisAuth: WebUntis antwortet nicht"
 mut S15 $A 's/        \$lokalFalsch = true;/        \$lokalFalsch = false;/' "Notfallpasswort falsch, WebUntis tot"
 mut S16 $A 's/    \$versuch = bremseBeginnen\(\$db, \$config, trim\(\$username\), \$ip\);/    \$versuch = 0;/' \
-  "fünf falsche Notfallpasswörter"
-mut S17 $A 's/\} elseif \(\$auth->grund\(\) === \x27ohne_entscheid\x27\) \{/} elseif (false) {/' \
+  "so viele falsche Notfallpasswörter wie die Schwelle"
+# S74: Der Ausfall ohne Notfallpasswort zählt nicht (vorher: elseif-Zweig).
+mut S17 $A 's/                Anmeldebremse::ohneEntscheid\(\$db, \$versuch\);/                Anmeldebremse::abschliessen(\$db, \$versuch, false, \x27x\x27);/' \
   "ohne Notfallpasswort, WebUntis tot"
+# S74: ohne den 503 fällt der Ausfall auf den Ablehnungssatz zurück.
+mut S20 $A 's/            Response::error\(Anmeldebremse::SATZ_AUSFALL, 503\);\n//' \
+  "ohne Notfallpasswort, WebUntis tot"
+# S74: 503 nur ohne Notfallpasswort – die frühere Fassung, die verriet, dass
+# es zu dem Kürzel ein Notfallpasswort gibt.
+mut S21 $A 's/                Anmeldebremse::ohneEntscheid\(\$db, \$versuch\);\n            \}\n            Response::error\(Anmeldebremse::SATZ_AUSFALL, 503\);/                Anmeldebremse::ohneEntscheid(\$db, \$versuch);\n                Response::error(Anmeldebremse::SATZ_AUSFALL, 503);\n            }/' \
+  "Notfallpasswort falsch, WebUntis tot"
 mut S18 $B 's/\x27Zu viele Fehlversuche\. Erneut versuchen in noch \x27 \. \$rest/\x27Zu viele Fehlversuche. Bitte später.\x27 . \x27\x27/' \
   "fünf Fehlversuche im Abstand von 15 s"
 mut S19 $A 's/            Anmeldebremse::abschliessen\(\$db, \$versuch, true, \x27lokal\x27\);/            null;/' \

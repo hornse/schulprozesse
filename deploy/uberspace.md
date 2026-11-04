@@ -97,8 +97,23 @@ sqlite3 $DB < $SRC/001_init.sql
 sqlite3 $DB < $SRC/002_seed_schritte.sql
 sqlite3 $DB < $SRC/003_einstellungen.sql        # Erscheinungsbild-Tabelle
 sqlite3 $DB < $SRC/004_instanz_anpassungen.sql  # Instanz-Anpassungen
-sqlite3 $DB < $SRC/seed_vorlagen_snapshots.sql  # Optional: 6 fertige Vorlagen
+sqlite3 $DB < $SRC/005_schritt_herkunft.sql     # Herkunft eigener Schritte
+sqlite3 $DB < $SRC/006_schritt_verschieben.sql  # Schritte verschieben
+sqlite3 $DB < $SRC/seed_vorlagen_snapshots.sql  # Optional: fertige Vorlagen
 ```
+
+**005 und 006 nur einmal.** Sie fügen Spalten mit `ALTER TABLE … ADD COLUMN`
+hinzu; SQLite kennt dafür kein `IF NOT EXISTS`. Ein zweiter Lauf bricht mit
+`duplicate column name` ab (gemessen am 04.11.2026 an einer leeren Datenbank).
+
+---
+
+## Sperrliste im Router
+
+Was die Apache-Vorlage sperrt (Editor-Reste, Datendateien, Einstellungen,
+Doku, Skripte, Punktdateien), liefert auch `dev-router.php` nicht aus – immer
+404. Die Liste steht in `backend/src/sperrliste.php`, geprüft mit
+`tests/sperrliste_test.php` gegen `php -S` (S62).
 
 ---
 
@@ -162,15 +177,18 @@ uberspace web log access disable
 ## Deployment-Workflow
 
 ```bash
-# Lokal committen und auf beide Remotes pushen
-git add -A
-git commit -m "Beschreibung"
-git push github main && git push uberspace main
-
-# Server-Logs prüfen falls Probleme
-supervisorctl status schulprozesse
+./deploy.sh "Beschreibung"
 ```
 
-Der post-receive Hook deployt automatisch nach `git push uberspace main`.
+**Nur über `deploy.sh`.** Es hält an, solange etwas unverfolgt oder nicht
+committet ist, lässt `./tests-schulprozesse.sh` laufen (rot: keine
+Auslieferung), setzt den Cache-Stempel `?v=` in `backend/public/index.html`,
+committet nur diese Datei und pusht nach `github` und `uberspace`. Ein Push
+von Hand liefert neuen Servercode mit altem Browsercode aus (REIHENREGELN 6).
+Belegt ist der Ablauf mit `tests/deploy_test.sh` (Probe-Klon, lokale
+Gegenstellen).
+
+Der post-receive Hook checkt nach dem Push auf `uberspace` aus. Danach bei
+Problemen: `supervisorctl status schulprozesse`.
 Ein `supervisorctl restart` ist normalerweise nicht nötig da PHP-Dateien
 bei jedem Request neu geladen werden.

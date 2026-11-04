@@ -101,6 +101,14 @@ Analog zur OOP:
 - Logo: MIME-Prüfung via `finfo`, SVG-Bereinigung, zufälliger Dateiname,
   Speicherung außerhalb des Webroots
 - Session-Hardening (HttpOnly, SameSite, Secure)
+- Anmeldebremse: Nach acht Fehlversuchen je Benutzername eine Minute
+  Wartezeit, nie eine Sperre; eine gelungene Anmeldung setzt zurück. Auch das
+  Notfallpasswort ist gebremst (`App\Auth\Anmeldebremse`)
+- Eine Ablehnung für alle Fälle, in denen ein Passwort entschied (falsches
+  Passwort, Kontotyp, keine Freigabe): derselbe Satz mit 401. Eigene Sätze nur
+  für die Wartezeit (429) und den WebUntis-Ausfall (503)
+- Sperrliste im Router: Was die Apache-Vorlage sperrt, liefert auch
+  `dev-router.php` nicht aus (404)
 
 ---
 
@@ -119,6 +127,7 @@ vorlagen_set_phasen     – Phasen eines Snapshots
 vorlagen_set_schritte   – Schritte eines Snapshots
 einstellungen           – Erscheinungsbild (Schulname, Farben, Logo)
 benutzer_rollen         – App-Freigaben
+login_log               – Anmeldeversuche (für die Anmeldebremse)
 aktivitaeten            – Aktivitätsprotokoll
 ```
 
@@ -132,6 +141,8 @@ sqlite3 data/app.sqlite < migrations/001_init.sql
 sqlite3 data/app.sqlite < migrations/002_seed_schritte.sql
 sqlite3 data/app.sqlite < migrations/003_einstellungen.sql
 sqlite3 data/app.sqlite < migrations/004_instanz_anpassungen.sql
+sqlite3 data/app.sqlite < migrations/005_schritt_herkunft.sql
+sqlite3 data/app.sqlite < migrations/006_schritt_verschieben.sql
 php -S localhost:8000 -t backend/public dev-router.php
 ```
 
@@ -141,8 +152,10 @@ php -S localhost:8000 -t backend/public dev-router.php
 ./deploy.sh "Beschreibung der Änderung"
 ```
 
-Das Script aktualisiert automatisch den Cache-Busting-Timestamp in `index.html`
-und pusht auf GitHub und Uberspace. Details zur Uberspace-Konfiguration
+Das Skript hält bei Unverfolgtem oder nicht Committetem an, lässt
+`./tests-schulprozesse.sh` laufen (rot: keine Auslieferung), setzt den
+Cache-Stempel in `index.html`, committet nur diese Datei und pusht auf GitHub
+und Uberspace. Details zur Uberspace-Konfiguration
 (supervisord, web backend, Symlinks) in `deploy/uberspace.md`.
 
 ---
